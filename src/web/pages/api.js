@@ -32,6 +32,8 @@ export function index(ctx) {
   ctx.json({
     name: 'ФСП РД API',
     version: '1',
+    docs: '/api/docs',
+    openapi: '/api/openapi.json',
     endpoints: {
       'GET /api/v1/competitions?tab=upcoming|current|finished': 'Список соревнований',
       'GET /api/v1/competitions/:id': 'Карточка соревнования с итогами',

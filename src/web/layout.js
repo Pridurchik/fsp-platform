@@ -108,7 +108,7 @@ ${flash}
     </nav>
     <nav class="footer-col" aria-label="Федерация">
       <p class="footer-head">Федерация</p>
-      <a href="/about">О федерации</a><a href="/documents">Документы</a><a href="/rating/method">Методика рейтинга</a><a href="/api/v1">Открытый API</a>
+      <a href="/about">О федерации</a><a href="/documents">Документы</a><a href="/rating/method">Методика рейтинга</a><a href="/api/docs">Открытый API</a>
     </nav>
     ${contacts.length ? html`<div class="footer-col">
       <p class="footer-head">Контакты</p>

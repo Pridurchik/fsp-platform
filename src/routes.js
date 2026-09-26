@@ -4,6 +4,7 @@ import * as auth from './web/pages/auth.js';
 import * as cabinet from './web/pages/cabinet.js';
 import * as admin from './web/pages/admin.js';
 import * as api from './web/pages/api.js';
+import * as docs from './web/pages/docs.js';
 import * as contest from './web/pages/contests.js';
 import * as hackathon from './web/pages/hackathon.js';
 import * as mobile from './web/pages/mobile.js';
@@ -98,6 +99,8 @@ route('POST', '/admin/submissions/:id/grade', contest.grade);
 
 // Открытый API для интеграций
 route('GET', '/api/v1', api.index);
+route('GET', '/api/openapi.json', docs.openapiJson);
+route('GET', '/api/docs', docs.docsPage);
 route('GET', '/api/v1/competitions', api.competitions);
 route('GET', '/api/v1/competitions/:id', api.competition);
 route('GET', '/api/v1/rating', api.rating);
