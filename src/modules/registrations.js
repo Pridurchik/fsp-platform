@@ -36,6 +36,16 @@ export function applyToEvent(athlete, eventId) {
   if (ev.max_team_size > 1 && !ev.allow_individual && !teamId) {
     return { error: 'Для этого соревнования нужно сначала создать команду или вступить в неё.', code: 'team', competitionId: ev.competition_id };
   }
+  if (teamId && ev.min_team_size > 1) {
+    const size = get('SELECT COUNT(*) AS n FROM team_members WHERE team_id = ?', teamId).n;
+    if (size < ev.min_team_size) {
+      return {
+        error: `В команде должно быть не меньше ${ev.min_team_size} участников, сейчас ${size}.`,
+        code: 'team_size',
+        competitionId: ev.competition_id,
+      };
+    }
+  }
   const existing = get('SELECT * FROM registrations WHERE event_id = ? AND athlete_id = ?', eventId, athlete.id);
   if (existing) {
     if (existing.status !== 'WITHDRAWN') return { error: 'Вы уже подали заявку в эту дисциплину', competitionId: ev.competition_id };
