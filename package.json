@@ -1,0 +1,17 @@
+{
+  "name": "fsp-rd-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Цифровая платформа Федерации спортивного программирования Республики Дагестан: соревнования, заявки, результаты и рейтинг",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "reset": "node --disable-warning=ExperimentalWarning scripts/reset.js",
+    "sample": "node --disable-warning=ExperimentalWarning scripts/reset.js --sample",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-reporter=spec"
+  }
+}
