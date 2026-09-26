@@ -118,8 +118,16 @@ export function joinTeamByCode(athlete, code, expectedCompetitionId = null) {
 export function leaveTeam(athlete, teamId) {
   const t = get('SELECT * FROM teams WHERE id = ?', teamId);
   if (!t) return { error: 'Команда не найдена' };
+  const competition = getCompetition(t.competition_id);
   const me = get('SELECT * FROM team_members WHERE team_id = ? AND athlete_id = ?', teamId, athlete.id);
   if (!me) return { error: 'Вы не состоите в этой команде', competitionId: t.competition_id };
+  if (competition && !competition.allow_individual && get(
+    `SELECT 1 FROM registrations r JOIN competition_events e ON e.id = r.event_id
+      WHERE e.competition_id = ? AND r.athlete_id = ? AND r.status IN ('SUBMITTED', 'APPROVED') LIMIT 1`,
+    t.competition_id, athlete.id,
+  )) {
+    return { error: 'Сначала отзовите заявку на соревнование, затем можно выйти из команды.', competitionId: t.competition_id };
+  }
   tx(() => {
     run('DELETE FROM team_members WHERE team_id = ? AND athlete_id = ?', teamId, athlete.id);
     run(
