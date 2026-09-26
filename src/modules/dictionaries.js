@@ -17,6 +17,8 @@ export const DISCIPLINE_INFO = {
 export const listDisciplines = () => all('SELECT * FROM disciplines ORDER BY sort_order, id');
 export const listLevels = () => all('SELECT * FROM competition_levels ORDER BY sort_order, id');
 export const listRanks = () => all('SELECT * FROM ranks ORDER BY sort_order, id');
+export const listTags = () => all('SELECT * FROM tags ORDER BY sort_order, name');
+export const listLanguages = () => all('SELECT * FROM languages ORDER BY sort_order, name');
 export const listMunicipalities = () => all("SELECT * FROM municipalities ORDER BY kind = 'DISTRICT', name");
 export const listOrganizations = () =>
   all(

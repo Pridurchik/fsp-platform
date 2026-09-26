@@ -18,6 +18,27 @@ const DISCIPLINES = [
   ['ROBOTICS', 'Программирование робототехники', 'Робототехника'],
 ];
 
+// Тематики хакатонов: на рейтинг не влияют, в отличие от дисциплин вида спорта.
+const TAGS = [
+  ['WEB', 'Веб-разработка'],
+  ['ML', 'ML и искусственный интеллект'],
+  ['MOBILE', 'Мобильная разработка'],
+  ['DATA', 'Анализ данных'],
+  ['GAME', 'Разработка игр'],
+  ['IOT', 'Интернет вещей'],
+];
+
+// Разрешённые языки программирования.
+const LANGUAGES = [
+  ['PY', 'Python'],
+  ['CPP', 'C++'],
+  ['JAVA', 'Java'],
+  ['CSHARP', 'C#'],
+  ['JS', 'JavaScript'],
+  ['GO', 'Go'],
+  ['KOTLIN', 'Kotlin'],
+];
+
 const LEVELS = [
   ['RUS', 'Чемпионат или Кубок России', 'ЧР / КР', 1000],
   ['ALLRUS', 'Другие всероссийские соревнования', 'Всероссийские', 600],
@@ -59,6 +80,12 @@ export function seedBase() {
     });
     RANKS.forEach(([code, name, short, kind, bonus], i) => {
       run('INSERT INTO ranks (code, name, short_name, kind, bonus_points, sort_order) VALUES (?, ?, ?, ?, ?, ?)', code, name, short, kind, bonus, i + 1);
+    });
+    TAGS.forEach(([code, name], i) => {
+      run('INSERT OR IGNORE INTO tags (code, name, sort_order) VALUES (?, ?, ?)', code, name, i + 1);
+    });
+    LANGUAGES.forEach(([code, name], i) => {
+      run('INSERT OR IGNORE INTO languages (code, name, sort_order) VALUES (?, ?, ?)', code, name, i + 1);
     });
     for (const name of CITIES) run("INSERT INTO municipalities (name, kind) VALUES (?, 'CITY')", name);
     for (const name of DISTRICTS) run("INSERT INTO municipalities (name, kind) VALUES (?, 'DISTRICT')", name);

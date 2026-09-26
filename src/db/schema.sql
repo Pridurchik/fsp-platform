@@ -102,6 +102,17 @@ CREATE TABLE IF NOT EXISTS competitions (
   reg_start            TEXT,
   reg_end              TEXT,
   regulations_url      TEXT,
+  organizer_name       TEXT NOT NULL DEFAULT '',
+  organizer_contacts   TEXT NOT NULL DEFAULT '',
+  event_url            TEXT,
+  rules_text           TEXT NOT NULL DEFAULT '',
+  prize_fund           TEXT NOT NULL DEFAULT '',
+  age_min              INTEGER CHECK (age_min IS NULL OR age_min >= 0),
+  age_max              INTEGER CHECK (age_max IS NULL OR age_max >= 0),
+  required_rank_id     INTEGER REFERENCES ranks(id),
+  min_team_size        INTEGER NOT NULL DEFAULT 1 CHECK (min_team_size >= 1),
+  max_team_size        INTEGER NOT NULL DEFAULT 1 CHECK (max_team_size >= 1),
+  allow_individual     INTEGER NOT NULL DEFAULT 1,
   is_external          INTEGER NOT NULL DEFAULT 0, -- внешний старт: вносим только своих, число участников вручную
   results_published_at TEXT,
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
@@ -121,10 +132,62 @@ CREATE TABLE IF NOT EXISTS registrations (
   id         INTEGER PRIMARY KEY,
   event_id   INTEGER NOT NULL REFERENCES competition_events(id) ON DELETE CASCADE,
   athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  team_id    INTEGER REFERENCES teams(id) ON DELETE CASCADE,
   status     TEXT NOT NULL DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'WITHDRAWN')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (event_id, athlete_id)
 );
+
+-- Тематики (web, ML, mobile…): в отличие от дисциплин вида спорта на рейтинг не влияют.
+CREATE TABLE IF NOT EXISTS tags (
+  id         INTEGER PRIMARY KEY,
+  code       TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS competition_tags (
+  competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+  tag_id         INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (competition_id, tag_id)
+);
+
+-- Разрешённые языки программирования.
+CREATE TABLE IF NOT EXISTS languages (
+  id         INTEGER PRIMARY KEY,
+  code       TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL UNIQUE,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS competition_languages (
+  competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+  language_id    INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+  PRIMARY KEY (competition_id, language_id)
+);
+
+-- Команды внутри соревнования. Результаты и рейтинг остаются индивидуальными:
+-- заявка каждого участника хранит team_id, командный зачёт выводится из них.
+CREATE TABLE IF NOT EXISTS teams (
+  id             INTEGER PRIMARY KEY,
+  competition_id INTEGER NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  invite_code    TEXT NOT NULL UNIQUE,
+  created_by     INTEGER REFERENCES athletes(id) ON DELETE SET NULL,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (competition_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS team_members (
+  team_id    INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  athlete_id INTEGER NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  is_captain INTEGER NOT NULL DEFAULT 0,
+  joined_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (team_id, athlete_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_members_athlete ON team_members(athlete_id);
+-- Индекс добавляется миграцией после ALTER TABLE для существующих баз.
 
 CREATE TABLE IF NOT EXISTS results (
   id         INTEGER PRIMARY KEY,

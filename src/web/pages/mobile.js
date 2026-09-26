@@ -634,6 +634,7 @@ export function apply(ctx) {
   if (!needAthlete(ctx)) return;
   const r = applyToEvent(ctx.athlete, Number(ctx.body.eventId));
   if (r.error === 'profile') return fail(ctx, 400, 'Сначала укажите в профиле населённый пункт и образовательную организацию.', { code: 'profile' });
+  if (r.code === 'birthdate') return fail(ctx, 400, r.error, { code: 'birthdate' });
   if (r.error) return fail(ctx, 400, r.error);
   ctx.json({ ok: true, message: 'Заявка подана. Когда организатор её одобрит, вас добавят в чат участников.' });
 }

@@ -7,11 +7,13 @@ import { leaderboard, athleteRating } from '../../modules/rating/service.js';
 import { disciplineByCode } from '../../modules/dictionaries.js';
 import { getAthlete } from '../../modules/athletes.js';
 import { fullName } from '../../core/format.js';
+import { competitionMeta } from '../../modules/competitions.js';
 
 const round1 = (n) => Math.round(n * 10) / 10;
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
 function competitionDto(c) {
+  const meta = competitionMeta(c.id);
   return {
     id: c.id,
     title: c.title,
@@ -25,6 +27,16 @@ function competitionDto(c) {
     endDate: c.end_date,
     registration: { start: c.reg_start, end: c.reg_end, open: registrationInfo(c).open },
     disciplines: (c.events || eventsOf(c.id)).map((e) => ({ code: e.discipline_code, name: e.discipline_name, registered: e.registered })),
+    organizer: c.organizer_name || null,
+    organizerContacts: c.organizer_contacts || null,
+    description: c.description || null,
+    eventUrl: c.event_url || null,
+    rules: c.rules_text || null,
+    prizeFund: c.prize_fund || null,
+    age: { min: c.age_min, max: c.age_max },
+    team: { minSize: c.min_team_size, maxSize: c.max_team_size, allowIndividual: Boolean(c.allow_individual) },
+    tags: meta.tags.map((x) => ({ code: x.code, name: x.name })),
+    languages: meta.languages.map((x) => ({ code: x.code, name: x.name })),
     url: `/competitions/${c.id}`,
   };
 }

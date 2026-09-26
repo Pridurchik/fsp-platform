@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import os from 'node:os';
 import { config } from './config.js';
 import { initDatabase, isDatabaseEmpty } from './db/index.js';
+import { migrate } from './db/migrate.js';
 import { seedBase, seedSample } from './db/seed.js';
 import { needsSetup, setupToken } from './core/setup.js';
 import { handleRequest } from './app.js';
@@ -20,6 +21,7 @@ function lanAddress() {
 // sample: заполнить пустую базу примером наполнения (для тестов и обучения).
 export async function startServer({ port = config.port, host = config.host, dbFile = config.dbFile, quiet = false, sample = false } = {}) {
   initDatabase(dbFile);
+  migrate();
   if (isDatabaseEmpty()) {
     seedBase();
     if (sample) seedSample();
@@ -54,7 +56,7 @@ export async function startServer({ port = config.port, host = config.host, dbFi
     const p = server.address().port;
     const base = config.publicUrl || `http://localhost:${p}`;
     console.log(`\n  Платформа ФСП РД запущена: ${base}`);
-    const lan = !config.publicUrl && host === '0.0.0.0' ? lanAddress() : null;
+    const lan = !config.publicUrl && ['0.0.0.0', '::'].includes(host) ? lanAddress() : null;
     if (lan) console.log(`  В локальной сети: http://${lan}:${p}`);
     if (needsSetup()) {
       console.log('\n  Аккаунта организатора ещё нет. Создайте его по одноразовой ссылке:');

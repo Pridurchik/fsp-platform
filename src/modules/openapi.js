@@ -104,6 +104,12 @@ export function openApiSpec() {
           responses: { 200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/MobileConfig' } } } } },
         },
       },
+      '/api/mobile/health': {
+        get: { tags: ['mobile-public'], summary: 'Проверка доступности приложения и БД', responses: { 200: { description: 'Сервер доступен' } } },
+      },
+      '/api/mobile/events': {
+        get: { tags: ['mobile-user'], summary: 'Поток событий уведомлений и чатов (SSE)', security: [{ bearerAuth: [] }], responses: { 200: { description: 'text/event-stream' }, 401: { description: 'Нужен вход' } } },
+      },
       '/api/mobile/login': {
         post: {
           tags: ['mobile-auth'],
@@ -362,6 +368,13 @@ export function openApiSpec() {
           responses: { 200: { description: 'OK' }, 400: { description: 'Ошибка валидации', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } } },
         },
       },
+      '/api/mobile/profile/rank': {
+        post: {
+          tags: ['mobile-athlete'], summary: 'Подать запрос на подтверждение разряда', security: [{ bearerAuth: [] }],
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['rankId', 'assignedAt'], properties: { rankId: { type: 'integer' }, assignedAt: { type: 'string', format: 'date' }, validUntil: { type: 'string', format: 'date', nullable: true }, orderNumber: { type: 'string' } } } } } },
+          responses: { 201: { description: 'Заявка создана' }, 400: { description: 'Ошибка валидации' }, 401: { description: 'Нужен вход' } },
+        },
+      },
       '/api/mobile/chats': {
         get: {
           tags: ['mobile-user'],
@@ -433,6 +446,14 @@ export function openApiSpec() {
           responses: { 200: { description: 'OK' }, 400: { description: 'Ошибка', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } } },
         },
       },
+      '/api/mobile/admin/competitions/{id}/transition': {
+        post: {
+          tags: ['mobile-admin'], summary: 'Сменить статус соревнования', security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['action'], properties: { action: { type: 'string', enum: ['publish', 'start', 'finish', 'cancel', 'unpublish', 'reopen'] } } } } } },
+          responses: { 200: { description: 'Статус изменён' }, 400: { description: 'Переход недопустим' }, 403: { description: 'Только организатор' } },
+        },
+      },
       '/api/mobile/admin/competitions/{id}/schedule': {
         post: {
           tags: ['mobile-admin'],
@@ -495,6 +516,16 @@ export function openApiSpec() {
             startDate: { type: 'string', format: 'date' },
             endDate: { type: 'string', format: 'date' },
             url: { type: 'string', example: '/competitions/1' },
+            organizer: { type: 'string', nullable: true },
+            organizerContacts: { type: 'string', nullable: true },
+            description: { type: 'string', nullable: true },
+            eventUrl: { type: 'string', nullable: true },
+            rules: { type: 'string', nullable: true },
+            prizeFund: { type: 'string', nullable: true },
+            age: { type: 'object', properties: { min: { type: 'integer', nullable: true }, max: { type: 'integer', nullable: true } } },
+            team: { type: 'object', properties: { minSize: { type: 'integer' }, maxSize: { type: 'integer' }, allowIndividual: { type: 'boolean' } } },
+            tags: { type: 'array', items: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } } },
+            languages: { type: 'array', items: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } } },
           },
         },
         RatingBoard: {

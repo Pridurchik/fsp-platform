@@ -1,6 +1,7 @@
 // Заявки спортсменов на дисциплины внутри соревнований.
 import { all, get, run } from '../db/index.js';
 import { registrationInfo } from './competitions.js';
+import { checkAgeAndRank } from './eligibility.js';
 import { audit, notify } from './notifications.js';
 import { syncMembership } from './chats.js';
 
@@ -15,19 +16,29 @@ export const isProfileComplete = (a) => Boolean(a && a.municipality_id && a.orga
 
 export function applyToEvent(athlete, eventId) {
   const ev = get(
-    `SELECT e.id, e.competition_id, c.status, c.reg_start, c.reg_end, c.title
+    `SELECT e.id, e.competition_id, c.status, c.reg_start, c.reg_end, c.title,
+            c.age_min, c.age_max, c.required_rank_id
        FROM competition_events e JOIN competitions c ON c.id = e.competition_id WHERE e.id = ?`,
     eventId,
   );
   if (!ev) return { error: 'Дисциплина не найдена' };
   if (!registrationInfo(ev).open) return { error: 'Регистрация на это соревнование сейчас закрыта', competitionId: ev.competition_id };
   if (!isProfileComplete(athlete)) return { error: 'profile', competitionId: ev.competition_id };
+  const blocked = checkAgeAndRank(athlete, ev);
+  if (blocked) return { ...blocked, competitionId: ev.competition_id };
+  // Участник команды подаётся вместе с ней: заявка помечается team_id.
+  const team = get(
+    `SELECT t.id FROM team_members m JOIN teams t ON t.id = m.team_id
+      WHERE t.competition_id = ? AND m.athlete_id = ?`,
+    ev.competition_id, athlete.id,
+  );
+  const teamId = team ? team.id : null;
   const existing = get('SELECT * FROM registrations WHERE event_id = ? AND athlete_id = ?', eventId, athlete.id);
   if (existing) {
     if (existing.status !== 'WITHDRAWN') return { error: 'Вы уже подали заявку в эту дисциплину', competitionId: ev.competition_id };
-    run("UPDATE registrations SET status = 'SUBMITTED', created_at = datetime('now') WHERE id = ?", existing.id);
+    run("UPDATE registrations SET status = 'SUBMITTED', team_id = ?, created_at = datetime('now') WHERE id = ?", teamId, existing.id);
   } else {
-    run('INSERT INTO registrations (event_id, athlete_id) VALUES (?, ?)', eventId, athlete.id);
+    run('INSERT INTO registrations (event_id, athlete_id, team_id) VALUES (?, ?, ?)', eventId, athlete.id, teamId);
   }
   return { ok: true, competitionId: ev.competition_id, title: ev.title };
 }

@@ -6,7 +6,7 @@ import { todayISO, addDays, fmtDate, fmtRange, fmtDateTime, ageYears } from '../
 import { fmt1, fmtK, signed, fullName, countOf } from '../../core/format.js';
 import {
   listCompetitions, getCompetition, eventsOf, registrationInfo, readCompetitionForm, validateCompetition, createCompetition as createComp,
-  updateCompetition as updateComp, applyTransition, TRANSITIONS, STATUS_LABELS, FORMAT_LABELS,
+  updateCompetition as updateComp, applyTransition, TRANSITIONS, STATUS_LABELS, FORMAT_LABELS, competitionMeta,
 } from '../../modules/competitions.js';
 import { competitionRegistrations, setRegistrationStatus, REG_STATUS_LABELS } from '../../modules/registrations.js';
 import {
@@ -17,7 +17,7 @@ import {
   validateRank, assignRank as assignRankFn, reviewRank as reviewRankFn, pendingRanks, RANK_STATUS_LABELS,
 } from '../../modules/athletes.js';
 import {
-  listDisciplines, listLevels, listRanks, listMunicipalities, listOrganizations, updateLevels, updateRanks, updateDisciplines,
+  listDisciplines, listLevels, listRanks, listTags, listLanguages, listMunicipalities, listOrganizations, updateLevels, updateRanks, updateDisciplines,
   addLevel, addDiscipline, addMunicipality, addOrganization, ORG_KINDS, MUNICIPALITY_KINDS,
 } from '../../modules/dictionaries.js';
 import { getRatingConfig, saveRatingConfig, qualificationsMap, computeAll, leaderboard } from '../../modules/rating/service.js';
@@ -185,7 +185,26 @@ function competitionForm(ctx, { values, errors = {}, action, submitLabel }) {
       ${ui.field({ label: 'Площадка', name: 'venue', value: values.venue || '' })}
     </div>
     ${ui.textarea({ label: 'Описание', name: 'description', value: values.description, rows: 5, hint: 'Пустая строка начинает новый абзац' })}
-    ${ui.field({ label: 'Ссылка на положение', name: 'regulations_url', value: values.regulations_url || '', error: errors.regulations_url, attrs: 'placeholder="https://..."' })}
+    <fieldset class="field"><legend>Условия участия</legend>
+      <div class="form-grid">
+        ${ui.field({ label: 'Минимальный возраст', name: 'age_min', type: 'number', value: values.age_min ?? '', error: errors.age_min, attrs: 'min="0" max="100"' })}
+        ${ui.field({ label: 'Максимальный возраст', name: 'age_max', type: 'number', value: values.age_max ?? '', error: errors.age_max, attrs: 'min="0" max="100"' })}
+        ${ui.field({ label: 'Минимум в команде', name: 'min_team_size', type: 'number', value: values.min_team_size ?? 1, error: errors.min_team_size, attrs: 'min="1" max="100"' })}
+        ${ui.field({ label: 'Максимум в команде', name: 'max_team_size', type: 'number', value: values.max_team_size ?? 1, error: errors.max_team_size, attrs: 'min="1" max="100"' })}
+      </div>
+      ${ui.checkbox({ name: 'allow_individual', label: 'Разрешено индивидуальное участие', checked: values.allow_individual ?? 1 })}
+      ${ui.select({ label: 'Требуемый разряд (минимум)', name: 'required_rank_id', value: values.required_rank_id || '', placeholder: 'Без требования', options: listRanks().map((r) => ({ value: r.id, label: `${r.name} (${r.short_name})` })) })}
+      ${ui.checkboxes({ legend: 'Теги мероприятия', name: 'tag_ids', values: values.tagIds || [], options: listTags().map((x) => ({ value: x.id, label: x.name })) })}
+      ${ui.checkboxes({ legend: 'Разрешённые языки программирования', name: 'language_ids', values: values.languageIds || [], options: listLanguages().map((x) => ({ value: x.id, label: x.name })) })}
+    </fieldset>
+    <fieldset class="field"><legend>Дополнительно</legend>
+      ${ui.field({ label: 'Организатор', name: 'organizer_name', value: values.organizer_name || '' })}
+      ${ui.textarea({ label: 'Контакты организатора', name: 'organizer_contacts', value: values.organizer_contacts || '', rows: 2 })}
+      ${ui.field({ label: 'Призовой фонд', name: 'prize_fund', value: values.prize_fund || '', hint: 'Например: 100 000 ₽ или призы от партнёров' })}
+      ${ui.field({ label: 'Ссылка на событие', name: 'event_url', value: values.event_url || '', error: errors.event_url, attrs: 'placeholder="https://..."' })}
+      ${ui.field({ label: 'Ссылка на положение', name: 'regulations_url', value: values.regulations_url || '', error: errors.regulations_url, attrs: 'placeholder="https://..."' })}
+      ${ui.textarea({ label: 'Правила участия', name: 'rules_text', value: values.rules_text || '', rows: 4 })}
+    </fieldset>
     ${ui.checkbox({ name: 'is_external', label: 'Внешнее соревнование', checked: values.is_external, hint: 'Например, Чемпионат России: вносим только своих спортсменов, число участников берём из протокола.' })}
     ${contestFieldset(values.contest || {}, errors)}
     <div class="form-actions"><button class="btn btn-accent" type="submit">${submitLabel}</button></div>
@@ -268,7 +287,14 @@ function contestSummary(c) {
 
 function editPage(ctx, c, { values, errors = {} } = {}) {
   const events = eventsOf(c.id);
-  const v = values || { ...c, disciplineIds: events.map((e) => e.discipline_id), contest: getContest(c.id) || {} };
+  const meta = competitionMeta(c.id);
+  const v = values || {
+    ...c,
+    disciplineIds: events.map((e) => e.discipline_id),
+    tagIds: meta.tags.map((x) => x.id),
+    languageIds: meta.languages.map((x) => x.id),
+    contest: getContest(c.id) || {},
+  };
   return page(ctx, { title: c.title, active: 'competitions', body: html`${ui.pageHead({ crumbs: [['/admin/competitions', 'Соревнования']], title: c.title })}
     ${competitionTabs(c, 'card')}
     <div class="detail-grid">

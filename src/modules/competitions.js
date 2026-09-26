@@ -3,6 +3,7 @@ import { all, get, run, tx } from '../db/index.js';
 import { todayISO, fmtDate, isISODate } from '../core/dates.js';
 import { audit } from './notifications.js';
 import { announceStatus } from './schedule.js';
+import { all as dbAll } from '../db/index.js';
 
 export const STATUS_LABELS = {
   DRAFT: 'Черновик',
@@ -127,6 +128,19 @@ export function readCompetitionForm(form) {
     reg_start: value('reg_start') || null,
     reg_end: value('reg_end') || null,
     regulations_url: value('regulations_url') || null,
+    organizer_name: value('organizer_name'),
+    organizer_contacts: value('organizer_contacts'),
+    event_url: value('event_url') || null,
+    rules_text: value('rules_text'),
+    prize_fund: value('prize_fund'),
+    age_min: value('age_min') === '' ? null : Number(value('age_min')),
+    age_max: value('age_max') === '' ? null : Number(value('age_max')),
+    required_rank_id: Number(value('required_rank_id')) || null,
+    min_team_size: Math.max(1, Number(value('min_team_size')) || 1),
+    max_team_size: Math.max(1, Number(value('max_team_size')) || 1),
+    allow_individual: form.get('allow_individual') === '1' ? 1 : 0,
+    tagIds: form.getAll('tag_ids').map(Number).filter(Boolean),
+    languageIds: form.getAll('language_ids').map(Number).filter(Boolean),
     is_external: form.get('is_external') === '1' ? 1 : 0,
     disciplineIds: form.getAll('discipline_ids').map(Number).filter(Boolean),
   };
@@ -144,22 +158,31 @@ export function validateCompetition(d) {
   if (d.reg_start && !isISODate(d.reg_start)) errors.reg_start = 'Неверная дата';
   if (d.reg_end && !isISODate(d.reg_end)) errors.reg_end = 'Неверная дата';
   if (d.reg_start && d.reg_end && d.reg_end < d.reg_start) errors.reg_end = 'Регистрация не может закрыться раньше, чем откроется';
+  if (d.age_min != null && (!Number.isInteger(d.age_min) || d.age_min < 0 || d.age_min > 100)) errors.age_min = 'Укажите корректный минимальный возраст';
+  if (d.age_max != null && (!Number.isInteger(d.age_max) || d.age_max < 0 || d.age_max > 100)) errors.age_max = 'Укажите корректный максимальный возраст';
+  if (d.age_min != null && d.age_max != null && d.age_max < d.age_min) errors.age_max = 'Максимальный возраст не может быть меньше минимального';
+  if (d.min_team_size > d.max_team_size) errors.max_team_size = 'Максимальный размер команды не может быть меньше минимального';
+  if (d.max_team_size > 1 && !d.allow_individual && d.min_team_size < 2) errors.min_team_size = 'Для командного формата минимум должен быть не меньше 2';
   if (d.format !== 'ONLINE' && !d.city) errors.city = 'Для очного формата укажите город';
   if (d.regulations_url && !/^(https?:\/\/|\/)/.test(d.regulations_url)) errors.regulations_url = 'Ссылка должна начинаться с http:// или https://';
+  if (d.event_url && !/^(https?:\/\/|\/)/.test(d.event_url)) errors.event_url = 'Ссылка должна начинаться с http:// или https://';
   return errors;
 }
 
 export function createCompetition(d, userId) {
   return tx(() => {
     const { id } = run(
-      `INSERT INTO competitions (title, level_id, format, city, venue, description, start_date, end_date, reg_start, reg_end, regulations_url, is_external)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO competitions (title, level_id, format, city, venue, description, start_date, end_date, reg_start, reg_end, regulations_url,
+         organizer_name, organizer_contacts, event_url, rules_text, prize_fund, age_min, age_max, required_rank_id, min_team_size, max_team_size, allow_individual, is_external)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       d.title, d.level_id, d.format, d.city, d.venue, d.description, d.start_date, d.end_date,
-      d.reg_start, d.reg_end, d.regulations_url, d.is_external,
+      d.reg_start, d.reg_end, d.regulations_url, d.organizer_name || '', d.organizer_contacts || '', d.event_url, d.rules_text || '', d.prize_fund || '',
+      d.age_min ?? null, d.age_max ?? null, d.required_rank_id ?? null, d.min_team_size ?? 1, d.max_team_size ?? 1, d.allow_individual ?? 1, d.is_external ?? 0,
     );
     for (const disciplineId of d.disciplineIds) {
       run('INSERT INTO competition_events (competition_id, discipline_id) VALUES (?, ?)', id, disciplineId);
     }
+    syncMeta(id, d);
     audit(userId, 'CREATE', 'competition', id, { title: d.title });
     return id;
   });
@@ -176,19 +199,36 @@ export function updateCompetition(id, d, userId) {
     }
     run(
       `UPDATE competitions SET title = ?, level_id = ?, format = ?, city = ?, venue = ?, description = ?, start_date = ?, end_date = ?,
-              reg_start = ?, reg_end = ?, regulations_url = ?, is_external = ?, updated_at = datetime('now')
+              reg_start = ?, reg_end = ?, regulations_url = ?, organizer_name = ?, organizer_contacts = ?, event_url = ?, rules_text = ?, prize_fund = ?,
+              age_min = ?, age_max = ?, required_rank_id = ?, min_team_size = ?, max_team_size = ?, allow_individual = ?, is_external = ?, updated_at = datetime('now')
         WHERE id = ?`,
       d.title, d.level_id, d.format, d.city, d.venue, d.description, d.start_date, d.end_date,
-      d.reg_start, d.reg_end, d.regulations_url, d.is_external, id,
+      d.reg_start, d.reg_end, d.regulations_url, d.organizer_name || '', d.organizer_contacts || '', d.event_url, d.rules_text || '', d.prize_fund || '',
+      d.age_min ?? null, d.age_max ?? null, d.required_rank_id ?? null, d.min_team_size ?? 1, d.max_team_size ?? 1, d.allow_individual ?? 1, d.is_external ?? 0, id,
     );
     for (const e of current) if (!keep.has(e.discipline_id)) run('DELETE FROM competition_events WHERE id = ?', e.id);
     const existing = new Set(current.map((e) => e.discipline_id));
     for (const disciplineId of d.disciplineIds) {
       if (!existing.has(disciplineId)) run('INSERT INTO competition_events (competition_id, discipline_id) VALUES (?, ?)', id, disciplineId);
     }
+    syncMeta(id, d);
     audit(userId, 'UPDATE', 'competition', id, { title: d.title });
     return { ok: true };
   });
+}
+
+function syncMeta(competitionId, d) {
+  run('DELETE FROM competition_tags WHERE competition_id = ?', competitionId);
+  for (const tagId of d.tagIds || []) run('INSERT OR IGNORE INTO competition_tags (competition_id, tag_id) VALUES (?, ?)', competitionId, tagId);
+  run('DELETE FROM competition_languages WHERE competition_id = ?', competitionId);
+  for (const languageId of d.languageIds || []) run('INSERT OR IGNORE INTO competition_languages (competition_id, language_id) VALUES (?, ?)', competitionId, languageId);
+}
+
+export function competitionMeta(competitionId) {
+  return {
+    tags: dbAll('SELECT t.* FROM tags t JOIN competition_tags x ON x.tag_id = t.id WHERE x.competition_id = ? ORDER BY t.sort_order, t.name', competitionId),
+    languages: dbAll('SELECT l.* FROM languages l JOIN competition_languages x ON x.language_id = l.id WHERE x.competition_id = ? ORDER BY l.sort_order, l.name', competitionId),
+  };
 }
 
 // Смена статуса, кроме публикации итогов (она в модуле результатов: там пересчёт рейтинга).

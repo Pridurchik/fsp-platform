@@ -7,7 +7,7 @@ import { get, all } from '../../db/index.js';
 import { todayISO, fmtDate, fmtRange, fmtMonthYear, addMonths, ageYears, parts, MONTHS_GEN } from '../../core/dates.js';
 import { fmt1, fmtK, plural, countOf, fullName, initials, signed } from '../../core/format.js';
 import {
-  listCompetitions, getCompetition, eventsOf, registrationInfo, PHASES, phaseCounts, FORMAT_LABELS, STATUS_LABELS,
+  listCompetitions, getCompetition, eventsOf, registrationInfo, PHASES, phaseCounts, FORMAT_LABELS, STATUS_LABELS, competitionMeta,
 } from '../../modules/competitions.js';
 import {
   applyToEvent, withdrawRegistration, athleteRegistrationsFor, competitionRegistrations, athleteRegistrations, isProfileComplete,
@@ -223,6 +223,7 @@ export function competition(ctx) {
   const registrations = competitionRegistrations(c.id).filter((r) => ['SUBMITTED', 'APPROVED'].includes(r.status));
   const results = c.status === 'RESULTS_PUBLISHED' && !k ? publishedResults(c.id) : [];
   const place = c.format === 'ONLINE' ? 'Дистанционно' : [c.city, c.venue].filter(Boolean).join(', ');
+  const meta = competitionMeta(c.id);
 
   let panel;
   if (reg.open) {
@@ -287,6 +288,11 @@ export function competition(ctx) {
           ${k ? html`<div><dt>Время</dt><dd>${k.start_time}–${k.end_time}</dd></div><div><dt>Проведение</dt><dd>На платформе: задания и отправка решений на этой странице</dd></div>` : ''}
           ${c.external_url ? html`<div><dt>Площадка</dt><dd><a href="${c.external_url}" rel="noopener" target="_blank">${c.external_platform || 'Контест на внешней площадке'}</a></dd></div>` : c.external_platform ? html`<div><dt>Площадка</dt><dd>${c.external_platform}</dd></div>` : ''}
           <div><dt>Уровень</dt><dd>${c.level_name} <span class="muted">(B = ${c.base_points})</span></dd></div>
+          ${c.organizer_name ? html`<div><dt>Организатор</dt><dd>${c.organizer_name}${c.organizer_contacts ? html`<span class="sub">${c.organizer_contacts}</span>` : ''}</dd></div>` : ''}
+          ${c.prize_fund ? html`<div><dt>Призовой фонд</dt><dd>${c.prize_fund}</dd></div>` : ''}
+          ${c.age_min != null || c.age_max != null ? html`<div><dt>Возраст</dt><dd>${c.age_min != null ? `от ${c.age_min} лет` : ''}${c.age_min != null && c.age_max != null ? ' · ' : ''}${c.age_max != null ? `до ${c.age_max} лет` : ''}</dd></div>` : ''}
+          ${c.min_team_size > 1 || c.max_team_size > 1 ? html`<div><dt>Команда</dt><dd>${c.min_team_size}–${c.max_team_size} участников${c.allow_individual ? ', можно индивидуально' : ''}</dd></div>` : ''}
+          ${c.event_url ? html`<div><dt>Ссылка</dt><dd><a href="${c.event_url}" target="_blank" rel="noopener">Открыть страницу мероприятия</a></dd></div>` : ''}
           <div><dt>Дисциплины</dt><dd>${events.map((e) => e.discipline_name).join(', ')}</dd></div>
           <div><dt>Формат</dt><dd>${FORMAT_LABELS[c.format]}</dd></div>
           ${place && c.format !== 'ONLINE' ? html`<div><dt>Место проведения</dt><dd>${place}</dd></div>` : ''}
@@ -294,6 +300,9 @@ export function competition(ctx) {
           <div><dt>Статус</dt><dd>${STATUS_LABELS[c.status]}</dd></div>
           ${c.regulations_url ? html`<div><dt>Положение</dt><dd><a href="${c.regulations_url}">Открыть документ</a></dd></div>` : ''}
         </dl>
+        ${meta.tags.length ? html`<div class="chips">${meta.tags.map((x) => ui.chip(x.name))}</div>` : ''}
+        ${meta.languages.length ? html`<p class="muted small">Разрешённые языки: ${meta.languages.map((x) => x.name).join(', ')}</p>` : ''}
+        ${c.rules_text ? html`<div class="page-readable"><h2 class="h3">Правила</h2>${paragraphs(c.rules_text)}</div>` : ''}
         ${c.description ? html`<div class="prose">${paragraphs(c.description)}</div>` : ''}
       </div>
       <aside class="side-panel reg-panel ${reg.open || mine.length ? 'is-priority' : ''}" aria-label="${panelTitle}">
@@ -337,10 +346,12 @@ export function apply(ctx) {
   if (!requireAthlete(ctx)) return;
   const id = Number(ctx.params.id);
   const r = applyToEvent(ctx.athlete, Number(ctx.form.get('event_id')));
-  if (r.error === 'profile') {
+  if (r.error === 'profile' || r.code === 'birthdate') {
     return ctx.redirect(`/cabinet/profile?next=${encodeURIComponent(`/competitions/${id}`)}`, {
       type: 'info',
-      text: 'Сначала укажите населённый пункт и образовательную организацию. После сохранения вернём вас к соревнованию.',
+      text: r.code === 'birthdate'
+        ? 'Для этого соревнования нужна дата рождения. Укажите её в профиле, после сохранения вернём вас к соревнованию.'
+        : 'Сначала укажите населённый пункт и образовательную организацию. После сохранения вернём вас к соревнованию.',
     });
   }
   if (r.error) return ctx.redirect(`/competitions/${r.competitionId || id}`, { type: 'error', text: r.error });
