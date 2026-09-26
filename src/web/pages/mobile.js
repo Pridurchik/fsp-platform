@@ -36,7 +36,7 @@ import { listNotifications, unreadCount, markAllRead } from '../../modules/notif
 import { getSettings } from '../../modules/settings.js';
 import {
   getContest, contestWindow, syncContestStatus, listTasks, participation, joinContest, submitSolution,
-  athleteSubmissions, submissionCounts, standings,
+  athleteSubmissions, athleteContests, submissionCounts, standings,
 } from '../../modules/contests.js';
 import {
   openChat, canUseChat, listMessages, postMessage, markRead, userChats, unreadChats, athleteMembersCount, chatMembers, chatOf,
@@ -904,6 +904,16 @@ export function cabinet(ctx) {
     qualificationText: q ? `+${q.bonus} к рейтингу${q.validUntil ? `, до ${fmtDate(q.validUntil)}` : ''}` : 'Нет подтверждённого разряда',
     pendingRanks: pending.map((p) => p.rank_short),
     registrations: Object.entries(PHASES).map(([key, p]) => ({ key, label: p.label, items: byPhase[key] })),
+    contests: athleteContests(a.id).map((c) => ({
+      id: c.id,
+      title: c.title,
+      status: c.status,
+      dates: fmtRange(c.start_date, c.end_date),
+      tasks: c.tasks,
+      submitted: c.submitted,
+      checked: c.checked,
+      url: `/competitions/${c.id}#tasks`,
+    })),
     notifications: listNotifications(ctx.user.id, 20).map(notificationDto),
     unread: unreadCount(ctx.user.id),
   });

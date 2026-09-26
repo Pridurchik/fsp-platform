@@ -1082,3 +1082,13 @@ table.data tbody td { padding-block: 15px; }
   .schedule-list li { grid-template-columns: 64px minmax(0, 1fr); }
   .schedule-list li > form, .schedule-list li > .pill { grid-column: 2; justify-self: start; }
 }
+
+/* Протокол контеста: подпись и печать. */
+.protocol-sign { margin-top: 24px; }
+.protocol-print { margin-top: 12px; }
+@media print {
+  .site-header, .site-footer, .admin-bar, .skip-link, .flash, .protocol-print, .page-actions { display: none !important; }
+  .wrap { max-width: none; padding: 0; }
+  body { background: #fff; }
+  .table-wrap { overflow: visible; }
+}

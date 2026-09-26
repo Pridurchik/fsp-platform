@@ -2,6 +2,7 @@
 // могут брать отсюда соревнования и рейтинг, не трогая базу напрямую.
 import { listCompetitions, getCompetition, eventsOf, registrationInfo, PHASES, STATUS_LABELS } from '../../modules/competitions.js';
 import { publishedResults } from '../../modules/results.js';
+import { getContest, standings } from '../../modules/contests.js';
 import { leaderboard, athleteRating } from '../../modules/rating/service.js';
 import { disciplineByCode } from '../../modules/dictionaries.js';
 import { getAthlete } from '../../modules/athletes.js';
@@ -37,6 +38,7 @@ export function index(ctx) {
     endpoints: {
       'GET /api/v1/competitions?tab=upcoming|current|finished': 'Список соревнований',
       'GET /api/v1/competitions/:id': 'Карточка соревнования с итогами',
+      'GET /api/v1/competitions/:id/standings': 'Таблица контеста на платформе',
       'GET /api/v1/rating?d=ALGO|PRODUCT|SECURITY|UAV|ROBOTICS': 'Рейтинг, общий или по дисциплине',
       'GET /api/v1/athletes/:id': 'Публичный профиль и разбор рейтинга',
     },
@@ -70,8 +72,7 @@ export function competition(ctx) {
   ctx.json(dto);
 }
 
-export function rating(ctx) {
-  const discipline = disciplineByCode(ctx.query.get('d'));
+export function rating(ctx) {  const discipline = disciplineByCode(ctx.query.get('d'));
   const board = leaderboard({ disciplineId: discipline?.id || null });
   ctx.json({
     asOf: board.asOf,
@@ -115,6 +116,34 @@ export function athlete(ctx) {
       kField: round3(l.kField),
       kTime: round3(l.kTime),
       points: round1(l.points),
+    })),
+  });
+}
+
+// Таблица контеста на платформе: та же логика, что на странице соревнования.
+export function standingsTable(ctx) {
+  const c = getCompetition(Number(ctx.params.id));
+  if (!c || c.status === 'DRAFT') return ctx.json({ error: 'Соревнование не найдено' }, 404);
+  const k = getContest(c.id);
+  if (!k?.on_platform) return ctx.json({ error: 'Это не контест на платформе' }, 404);
+  const s = standings(c.id);
+  ctx.json({
+    competitionId: c.id,
+    title: c.title,
+    status: c.status,
+    final: c.status === 'RESULTS_PUBLISHED',
+    tasks: s.tasks.map((t) => ({ id: t.id, letter: t.letter, title: t.title, maxScore: t.max_score })),
+    rows: s.rows.map((r) => ({
+      place: r.place,
+      athleteId: r.athlete.is_public ? r.athleteId : null,
+      name: r.athlete.is_public ? fullName(r.athlete) : null,
+      organization: r.athlete.organization,
+      total: r.total,
+      pending: r.pending,
+      cells: s.tasks.map((t) => {
+        const cell = r.cells.get(t.id);
+        return cell ? { best: cell.best, attempts: cell.attempts, pending: cell.pending } : null;
+      }),
     })),
   });
 }

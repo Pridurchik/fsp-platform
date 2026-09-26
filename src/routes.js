@@ -96,6 +96,8 @@ route('POST', '/admin/tasks/:id', contest.updateTask);
 route('POST', '/admin/tasks/:id/delete', contest.deleteTask);
 route('GET', '/admin/competitions/:id/submissions', contest.submissions);
 route('POST', '/admin/submissions/:id/grade', contest.grade);
+route('GET', '/admin/competitions/:id/protocol.csv', contest.protocolCsv);
+route('GET', '/competitions/:id/protocol', contest.protocolPage);
 
 // Открытый API для интеграций
 route('GET', '/api/v1', api.index);
@@ -103,6 +105,7 @@ route('GET', '/api/openapi.json', docs.openapiJson);
 route('GET', '/api/docs', docs.docsPage);
 route('GET', '/api/v1/competitions', api.competitions);
 route('GET', '/api/v1/competitions/:id', api.competition);
+route('GET', '/api/v1/competitions/:id/standings', api.standingsTable);
 route('GET', '/api/v1/rating', api.rating);
 route('GET', '/api/v1/athletes/:id', api.athlete);
 

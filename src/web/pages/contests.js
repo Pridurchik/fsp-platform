@@ -10,13 +10,21 @@ import { publishedResults } from '../../modules/results.js';
 import {
   getContest, contestWindow, syncContestStatus, listTasks, getTask, readTaskForm, validateTask, addTask as addTaskFn,
   updateTask as updateTaskFn, deleteTask as deleteTaskFn, participation, joinContest, submitSolution, listSubmissions,
-  athleteSubmissions, submissionCounts, gradeSubmission, standings, contestPublishProblems,
+  athleteSubmissions, submissionCounts, gradeSubmission, standings, contestPublishProblems, taskStats,
 } from '../../modules/contests.js';
 import { adminPage, competitionTabs } from '../admin-layout.js';
+import { layout } from '../layout.js';
 import { requireAthlete, requireOrganizer } from '../guards.js';
 import { errorPage } from './errors.js';
 
 const notFound = (ctx) => ctx.html(errorPage(ctx, 404), 404);
+
+// CSV для протокола контеста (тот же формат, что у участников и рейтинга: ; + BOM).
+const csvCell = (v) => {
+  const s = v === null || v === undefined ? '' : String(v);
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const toCsv = (rows) => '﻿' + rows.map((r) => r.map(csvCell).join(';')).join('\r\n');
 
 // Контест из параметра маршрута, со сменой статуса по времени, если она включена.
 function loadContest(ctx) {
@@ -32,9 +40,10 @@ const countdown = (date, label) => html`<span class="countdown">${label} <b data
 export function contestStatusLine(c, k) {
   const { start, end } = contestWindow(c, k);
   const now = new Date();
+  const serverTime = now.toTimeString().slice(0, 5);
   const when = `${fmtRange(c.start_date, c.end_date)}, ${k.start_time}–${k.end_time}`;
-  if (c.status === 'PUBLISHED') return html`<p class="contest-status"><span>Контест начнётся ${fmtDate(c.start_date)} в ${k.start_time}</span>${start > now ? countdown(start, 'До начала') : ''}</p>`;
-  if (c.status === 'ONGOING') return html`<p class="contest-status is-live"><span>Контест идёт · ${when}</span>${end > now ? countdown(end, 'До окончания') : html`<span>Время вышло, организатор завершит контест</span>`}</p>`;
+  if (c.status === 'PUBLISHED') return html`<p class="contest-status"><span>Контест начнётся ${fmtDate(c.start_date)} в ${k.start_time}</span>${start > now ? countdown(start, 'До начала') : ''}<span class="muted small">Время сервера: ${serverTime}</span></p>`;
+  if (c.status === 'ONGOING') return html`<p class="contest-status is-live"><span>Контест идёт · ${when}</span>${end > now ? countdown(end, 'До окончания') : html`<span>Время вышло, организатор завершит контест</span>`}<span class="muted small">Время сервера: ${serverTime} · после кнопки «Завершить» отправка закроется</span></p>`;
   if (c.status === 'FINISHED') return html`<p class="contest-status"><span>Контест завершён. Идёт проверка решений, таблица предварительная</span></p>`;
   if (c.status === 'RESULTS_PUBLISHED') return html`<p class="contest-status"><span>Итоги опубликованы и учтены в рейтинге</span></p>`;
   return '';
@@ -169,6 +178,15 @@ export function submit(ctx) {
 
 // ---------- кабинет организатора ----------
 
+// Короткая статистика по заданиям: попытки, проверено, средний и лучший баллы.
+function taskStatsList(stats) {
+  if (!stats.length) return html`<p class="muted small">Заданий пока нет.</p>`;
+  return html`<ol class="leader-list">${stats.map((s) => html`<li>
+    <span class="task-letter">${s.letter}</span>
+    <span class="leader-name">${s.title}<span class="sub">${s.total ? `попыток: ${s.total}, проверено: ${s.checked}${s.avg !== null ? `, средн. ${s.avg}` : ''}${s.best !== null ? `, лучш. ${s.best}` : ''}` : 'решений нет'}</span></span>
+    <span class="leader-score">до ${s.max_score}</span></li>`)}</ol>`;
+}
+
 function statusActions(ctx, c, back) {
   const transitions = (TRANSITIONS[c.status] || []).filter((t) => !t.danger && t.action !== 'unpublish');
   if (!transitions.length) return '';
@@ -276,16 +294,30 @@ export function submissions(ctx) {
   const c = loadContest(ctx);
   if (!c) return notFound(ctx);
   const showAll = ctx.query.get('show') === 'all';
+  const tasks = listTasks(c.id);
+  const taskParam = Number(ctx.query.get('task')) || null;
+  const taskFilter = tasks.some((t) => t.id === taskParam) ? taskParam : null;
   const counts = submissionCounts(c.id);
-  const list = listSubmissions(c.id, { pending: !showAll });
-  const back = `/admin/competitions/${c.id}/submissions${showAll ? '?show=all' : ''}`;
+  const list = listSubmissions(c.id, { pending: !showAll, taskId: taskFilter });
+  const qs = (show, task) => {
+    const p = new URLSearchParams();
+    if (show) p.set('show', 'all');
+    if (task) p.set('task', task);
+    const s = p.toString();
+    return `/admin/competitions/${c.id}/submissions${s ? `?${s}` : ''}`;
+  };
+  const back = qs(showAll, taskFilter);
   const problems = c.status === 'FINISHED' ? contestPublishProblems(c.id) : [];
 
   const body = html`${contestHead(c, 'Решения', 'Откройте решение, выставьте баллы и сохраните: оценка сразу попадает в таблицу.')}
     ${ui.tabs([
-      { href: `/admin/competitions/${c.id}/submissions`, label: 'Ждут проверки', count: counts.pending, active: !showAll },
-      { href: `/admin/competitions/${c.id}/submissions?show=all`, label: 'Все решения', count: counts.total, active: showAll },
+      { href: qs(false, taskFilter), label: 'Ждут проверки', count: counts.pending, active: !showAll },
+      { href: qs(true, taskFilter), label: 'Все решения', count: counts.total, active: showAll },
     ], 'Фильтр решений')}
+    ${tasks.length ? ui.tabs([
+      { href: qs(showAll, null), label: 'Все задания', active: !taskFilter },
+      ...tasks.map((t) => ({ href: qs(showAll, t.id), label: `${t.letter}. ${t.title.length > 24 ? `${t.title.slice(0, 24)}…` : t.title}`, active: taskFilter === t.id })),
+    ], 'Задание') : ''}
     <div class="detail-grid">
       <div class="submission-list">${list.length ? list.map((s) => html`<article class="panel submission ${s.score === null ? 'is-pending' : ''}" id="s-${s.id}">
         <header class="submission-head">
@@ -302,7 +334,7 @@ export function submissions(ctx) {
           <button class="btn ${s.score === null ? 'btn-accent' : 'btn-ghost'}" type="submit">${s.score === null ? 'Сохранить оценку' : 'Изменить оценку'}</button>
         </form>
         ${s.score !== null ? html`<p class="small muted">Проверено ${fmtDateTime(s.checked_at)}: ${s.score} из ${s.max_score}</p>` : ''}
-      </article>`) : ui.empty(showAll ? 'Решений пока нет.' : 'Все решения проверены.', showAll ? '' : html`<a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/submissions?show=all">Показать все</a>`)}</div>
+      </article>`) : ui.empty(taskFilter ? 'По этому заданию решений нет.' : showAll ? 'Решений пока нет.' : 'Все решения проверены.', taskFilter ? html`<a class="btn btn-ghost btn-sm" href="${qs(showAll, null)}">Все задания</a>` : showAll ? '' : html`<a class="btn btn-ghost btn-sm" href="${qs(true, taskFilter)}">Показать все</a>`)}</div>
       <aside class="side-panel status-panel">
         <h2 class="h3">Статус</h2>
         <p>${ui.statusPill(c.status)}</p>
@@ -310,6 +342,12 @@ export function submissions(ctx) {
         ${statusActions(ctx, c, back)}
         <h2 class="h3">Таблица</h2>
         ${standingsTable(ctx, c, { compact: true })}
+        <h2 class="h3">По заданиям</h2>
+        ${taskStatsList(taskStats(c.id))}
+        <div class="stack-actions">
+          <a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/protocol.csv">Скачать протокол CSV</a>
+          ${['FINISHED', 'RESULTS_PUBLISHED'].includes(c.status) ? html`<a class="btn btn-ghost btn-sm" href="/competitions/${c.id}/protocol">Версия для печати</a>` : ''}
+        </div>
         ${c.status !== 'DRAFT' ? html`<a class="btn btn-ghost btn-sm" href="/competitions/${c.id}${['FINISHED', 'RESULTS_PUBLISHED'].includes(c.status) ? '#results' : ''}">Контест на сайте</a>` : ''}
       </aside>
     </div>`;
@@ -323,5 +361,48 @@ export function grade(ctx) {
   const back = String(ctx.form.get('back') || '');
   const target = back.startsWith(`/admin/competitions/${r.competitionId}/submissions`) ? back : `/admin/competitions/${r.competitionId}/submissions`;
   ctx.redirect(target, r.error ? { type: 'error', text: r.error } : 'Оценка сохранена и учтена в таблице.');
+}
+
+// ---------- протокол: CSV и печатная версия ----------
+
+// Итоговая таблица контеста для жюри и Федерации: место, ФИО, организация, баллы по заданиям, сумма.
+export function protocolCsv(ctx) {
+  if (!requireOrganizer(ctx)) return;
+  const c = loadContest(ctx);
+  if (!c) return notFound(ctx);
+  const { tasks, rows } = standings(c.id);
+  const header = ['Место', 'Фамилия', 'Имя', 'Отчество', 'Организация', ...tasks.map((t) => `${t.letter} (${t.max_score})`), 'Сумма'];
+  const lines = rows.map((r) => [
+    r.place, r.athlete.last_name, r.athlete.first_name, r.athlete.middle_name || '', r.athlete.organization || '',
+    ...tasks.map((t) => {
+      const cell = r.cells.get(t.id);
+      return cell?.best ?? '';
+    }),
+    r.total,
+  ]);
+  ctx.file(toCsv([header, ...lines]), `protokol-${c.id}.csv`, 'text/csv; charset=utf-8');
+}
+
+// Печатная версия протокола: та же таблица, без форм и сайдбара. Видна, когда итоги уже считаются.
+export function protocolPage(ctx) {
+  let c = getCompetition(Number(ctx.params.id));
+  if (!c || !c.on_platform) return notFound(ctx);
+  if (c.status === 'DRAFT' && !ctx.isOrganizer) return notFound(ctx);
+  c = syncContestStatus(c);
+  const k = getContest(c.id);
+  const showTable = ['FINISHED', 'RESULTS_PUBLISHED'].includes(c.status);
+  const body = html`<section class="wrap section page-readable protocol">
+    ${ui.pageHead({
+      crumbs: [['/competitions', 'Соревнования'], [`/competitions/${c.id}`, c.title]],
+      eyebrow: `Протокол · ${fmtRange(c.start_date, c.end_date)}${k ? ` · ${k.start_time}–${k.end_time}` : ''}`,
+      title: `Протокол: ${c.title}`,
+      lede: c.status === 'RESULTS_PUBLISHED' ? 'Итоговая таблица. Результаты учтены в рейтинге.' : 'Предварительная таблица.',
+      actions: ctx.isOrganizer ? html`<a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/protocol.csv">Скачать CSV</a>` : '',
+    })}
+    ${showTable ? standingsTable(ctx, c, { final: c.status === 'RESULTS_PUBLISHED' }) : html`<p class="muted">Протокол появится после завершения контеста.</p>`}
+    <p class="muted small protocol-sign">Главный судья ________________ / Дата ________________</p>
+    <p class="protocol-print"><button class="btn" type="button" onclick="window.print()">Печать</button></p>
+  </section>`;
+  ctx.html(layout(ctx, { title: `Протокол: ${c.title}`, section: 'competitions', body }));
 }
 

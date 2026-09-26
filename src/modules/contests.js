@@ -187,13 +187,55 @@ function withLetters(competitionId, rows) {
   return rows.map((s) => ({ ...s, letter: letters.get(s.task_id) }));
 }
 
-export function listSubmissions(competitionId, { pending = false } = {}) {
+export function listSubmissions(competitionId, { pending = false, taskId = null } = {}) {
+  const params = [competitionId];
+  let extra = pending ? 'AND s.score IS NULL' : '';
+  if (taskId) {
+    extra += ' AND t.id = ?';
+    params.push(taskId);
+  }
   const rows = all(
-    `${SUBMISSION_SQL} WHERE t.competition_id = ? ${pending ? 'AND s.score IS NULL' : ''}
+    `${SUBMISSION_SQL} WHERE t.competition_id = ? ${extra}
       ORDER BY s.score IS NOT NULL, s.created_at ${pending ? 'ASC' : 'DESC'}, s.id`,
-    competitionId,
+    ...params,
   );
   return withLetters(competitionId, rows);
+}
+
+export function submissionCountsByTask(competitionId) {
+  return all(
+    `SELECT t.id AS task_id, COUNT(s.id) AS total, COALESCE(SUM(s.score IS NULL), 0) AS pending
+       FROM contest_tasks t LEFT JOIN submissions s ON s.task_id = t.id
+      WHERE t.competition_id = ? GROUP BY t.id`,
+    competitionId,
+  );
+}
+
+// Статистика по заданиям для организатора: попыток, проверено, средний и лучший баллы.
+export function taskStats(competitionId) {
+  const tasks = listTasks(competitionId);
+  const rows = new Map(
+    all(
+      `SELECT s.task_id, COUNT(*) AS total, SUM(s.score IS NOT NULL) AS checked,
+              AVG(s.score) AS avg_score, MAX(s.score) AS best_score
+         FROM submissions s JOIN contest_tasks t ON t.id = s.task_id
+        WHERE t.competition_id = ? GROUP BY s.task_id`,
+      competitionId,
+    ).map((r) => [r.task_id, r]),
+  );
+  return tasks.map((t) => {
+    const r = rows.get(t.id) || { total: 0, checked: 0, avg_score: null, best_score: null };
+    return {
+      id: t.id,
+      letter: t.letter,
+      title: t.title,
+      max_score: t.max_score,
+      total: r.total,
+      checked: r.checked,
+      avg: r.avg_score === null ? null : Math.round(r.avg_score * 10) / 10,
+      best: r.best_score,
+    };
+  });
 }
 
 export const athleteSubmissions = (competitionId, athleteId) =>
@@ -296,6 +338,31 @@ export function syncResults(competitionId) {
     run('UPDATE competition_events SET participants_total = NULL WHERE id = ?', ev.id);
   });
   return rows.length;
+}
+
+// Контесты спортсмена для кабинета: где участвует, сколько отправлено и проверено.
+export function athleteContests(athleteId) {
+  const rows = all(
+    `SELECT c.id, c.title, c.status, c.start_date, c.end_date, k.start_time, k.end_time
+       FROM competitions c
+       JOIN contests k ON k.competition_id = c.id
+       JOIN competition_events e ON e.competition_id = c.id
+       JOIN registrations r ON r.event_id = e.id
+      WHERE k.on_platform = 1 AND r.athlete_id = ? AND r.status IN ${ACTIVE_REG}
+      ORDER BY c.start_date DESC, c.id DESC`,
+    athleteId,
+  );
+  const seen = new Map();
+  for (const r of rows) if (!seen.has(r.id)) seen.set(r.id, r);
+  return [...seen.values()].map((c) => {
+    const mine = athleteSubmissions(c.id, athleteId);
+    return {
+      ...c,
+      tasks: listTasks(c.id).length,
+      submitted: mine.length,
+      checked: mine.filter((s) => s.score !== null).length,
+    };
+  });
 }
 
 // Проверки перед публикацией итогов контеста.

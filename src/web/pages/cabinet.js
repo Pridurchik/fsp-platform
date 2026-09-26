@@ -13,6 +13,7 @@ import {
   submitRankRequest, RANK_STATUS_LABELS,
 } from '../../modules/athletes.js';
 import { listDisciplines, listMunicipalities, listOrganizations, listRanks } from '../../modules/dictionaries.js';
+import { athleteContests } from '../../modules/contests.js';
 import { requireAthlete, safeNext } from '../guards.js';
 
 function subnav(active) {
@@ -23,6 +24,19 @@ function subnav(active) {
     ],
     'Кабинет',
   );
+}
+
+// Контесты на платформе, где спортсмен участвует: отправлено и проверено решений.
+function contestSummary(athleteId) {
+  const items = athleteContests(athleteId);
+  if (!items.length) return ui.empty('Нет участий в контестах на платформе.');
+  return html`<div class="table-wrap"><table class="data">
+    <thead><tr><th scope="col">Контест</th><th scope="col">Статус</th><th scope="col" class="num">Решения</th></tr></thead>
+    <tbody>${items.map((c) => html`<tr>
+      <td><a href="/competitions/${c.id}#tasks">${c.title}</a><span class="sub">${fmtRange(c.start_date, c.end_date)} · заданий: ${c.tasks}</span></td>
+      <td>${ui.statusPill(c.status)}</td>
+      <td class="num small">${c.submitted ? `${c.submitted} отпр., ${c.checked} пров.` : html`<span class="muted">ещё нет</span>`}</td>
+    </tr>`)}</tbody></table></div>`;
 }
 
 export function overview(ctx) {
@@ -81,6 +95,8 @@ export function overview(ctx) {
             <td class="num">${r.competition_status === 'RESULTS_PUBLISHED' && r.place ? html`${ui.placeMark(r.place)} <span class="muted small">из ${r.participants_total || r.placed}</span>` : html`<span class="muted small">${r.competition_status === 'CANCELLED' ? 'отменено' : 'ждём итоги'}</span>`}</td>
           </tr>`)}</tbody></table></div>`
           : ui.empty(tab === 'upcoming' ? 'Заявок на предстоящие соревнования нет.' : 'Здесь пока пусто.', tab === 'upcoming' ? html`<a class="btn btn-accent btn-sm" href="/competitions">Выбрать соревнование</a>` : '')}
+        <div class="section-head"><h2>Мои контесты и решения</h2><span class="muted small">Отправки на платформе</span></div>
+        ${contestSummary(a.id)}
       </div>
       <aside class="side-panel">
         <div class="section-head compact"><h2 class="h3">Уведомления${unread ? html` <span class="badge">${unread}</span>` : ''}</h2>

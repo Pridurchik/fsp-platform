@@ -67,6 +67,17 @@ export function openApiSpec() {
           },
         },
       },
+      '/api/v1/competitions/{id}/standings': {
+        get: {
+          tags: ['v1'],
+          summary: 'Таблица контеста на платформе (места, баллы по заданиям)',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          responses: {
+            200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ContestStandings' } } } },
+            404: { description: 'Не контест, черновик или нет такого', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          },
+        },
+      },
       '/api/v1/rating': {
         get: {
           tags: ['v1'],
@@ -504,6 +515,17 @@ export function openApiSpec() {
             position: { type: 'integer', nullable: true },
             of: { type: 'integer' },
             counted: { type: 'array', items: { type: 'object' } },
+          },
+        },
+        ContestStandings: {
+          type: 'object',
+          properties: {
+            competitionId: { type: 'integer' },
+            title: { type: 'string' },
+            status: { type: 'string' },
+            final: { type: 'boolean' },
+            tasks: { type: 'array', items: { type: 'object' } },
+            rows: { type: 'array', items: { type: 'object' } },
           },
         },
         MobileConfig: {
