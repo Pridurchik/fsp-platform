@@ -106,7 +106,7 @@ export function layout(ctx, { title = '', body, section = '', description = '' }
 <link rel="stylesheet" href="/static/brand.css">
 <script src="/static/app.js" defer></script>
 </head>
-<body>
+<body data-authenticated="${ctx.user ? 'true' : 'false'}">
 <a class="skip-link" href="#main">Перейти к содержимому</a>
 <header class="site-header">
   <div class="wrap header-row">

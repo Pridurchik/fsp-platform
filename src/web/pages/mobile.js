@@ -359,6 +359,51 @@ export function events(ctx) {
   });
 }
 
+// Browser SSE uses the regular HttpOnly session cookie, not the mobile Bearer token.
+export function webEvents(ctx) {
+  if (!ctx.user) {
+    ctx.json({ error: 'Войдите в аккаунт' }, 401);
+    return;
+  }
+  const { req, res, user } = ctx;
+  const organizer = ctx.isOrganizer;
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+  });
+  const send = (event, data, id = null) => {
+    if (res.destroyed || res.writableEnded) return;
+    if (id !== null) res.write(`id: ${id}\n`);
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  send('ready', { unread: unreadCount(user.id) });
+
+  let closed = false;
+  const unsubscribe = subscribe((e) => {
+    if (e.type !== 'notification' || e.userId !== user.id) return;
+    try {
+      const n = get('SELECT * FROM notifications WHERE id = ?', e.id);
+      if (n) send('notification', { notification: notificationDto(n), unread: unreadCount(user.id) }, e.id);
+    } catch (err) {
+      console.error('Web notification SSE:', err);
+    }
+  });
+
+  const heartbeat = setInterval(() => {
+    if (!res.destroyed && !res.writableEnded) res.write(': ping\n\n');
+  }, 25_000);
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(heartbeat);
+    unsubscribe();
+  };
+  req.on('close', close);
+  res.on('close', close);
+}
+
 // ---------- главная и соревнования ----------
 
 export function home(ctx) {

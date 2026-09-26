@@ -9,6 +9,7 @@ import { startServer } from '../src/main.js';
 import { get } from '../src/db/index.js';
 import { SAMPLE_PASSWORD } from '../src/db/seed.js';
 import { athleteContests, taskStats, listSubmissions } from '../src/modules/contests.js';
+import { notify } from '../src/modules/notifications.js';
 
 const dbFile = path.join(os.tmpdir(), `fsp-protocol-${process.pid}.sqlite`);
 let server;
@@ -27,6 +28,7 @@ function client() {
     return { status: res.status, location: res.headers.get('location'), text: await res.text(), headers: res.headers };
   }
   return {
+    jar,
     get: (url) => send(url, { method: 'GET', headers: {} }),
     async post(url, fields) {
       if (!jar.has('fsp_csrf')) await this.get('/');
@@ -36,6 +38,23 @@ function client() {
     },
   };
 }
+
+test('веб SSE: авторизация, ready и персональное уведомление', async () => {
+  const user = client();
+  await user.post('/login', { email: 'novice@example.com', password: SAMPLE_PASSWORD });
+  const response = await fetch(base + '/api/events', { headers: { cookie: [...user.jar].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('; ') } });
+  assert.equal(response.status, 200);
+  const reader = response.body.getReader();
+  const first = new TextDecoder().decode((await reader.read()).value);
+  assert.match(first, /event: ready/);
+  const athlete = get("SELECT a.id FROM athletes a JOIN users u ON u.id = a.user_id WHERE u.email = 'novice@example.com'").id;
+  const userId = get('SELECT user_id FROM athletes WHERE id = ?', athlete).user_id;
+  notify(userId, 'Тестовое уведомление', 'Проверка SSE', '/cabinet');
+  const second = new TextDecoder().decode((await reader.read()).value);
+  assert.match(second, /event: notification/);
+  assert.match(second, /Тестовое уведомление/);
+  reader.cancel();
+});
 
 before(async () => {
   for (const s of ['', '-wal', '-shm']) rmSync(dbFile + s, { force: true });

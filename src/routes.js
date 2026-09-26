@@ -117,6 +117,7 @@ route('GET', '/api/v1/athletes/:id', api.athlete);
 route('GET', '/api/mobile/config', mobile.config);
 route('GET', '/api/mobile/health', mobile.health);
 route('GET', '/api/mobile/events', mobile.events);
+route('GET', '/api/events', mobile.webEvents);
 route('POST', '/api/mobile/login', mobile.login);
 route('POST', '/api/mobile/demo-login', mobile.demoLogin);
 route('POST', '/api/mobile/register', mobile.register);

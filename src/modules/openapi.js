@@ -110,6 +110,9 @@ export function openApiSpec() {
       '/api/mobile/events': {
         get: { tags: ['mobile-user'], summary: 'Поток событий уведомлений и чатов (SSE)', security: [{ bearerAuth: [] }], responses: { 200: { description: 'text/event-stream' }, 401: { description: 'Нужен вход' } } },
       },
+      '/api/events': {
+        get: { tags: ['v1'], summary: 'Realtime-уведомления для веб-кабинета (SSE, cookie-сессия)', security: [{ cookieAuth: [] }], responses: { 200: { description: 'text/event-stream' }, 401: { description: 'Нужен вход' } } },
+      },
       '/api/mobile/login': {
         post: {
           tags: ['mobile-auth'],
@@ -519,6 +522,7 @@ export function openApiSpec() {
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer', description: 'Токен из POST /api/mobile/login в заголовке Authorization: Bearer <token>' },
+        cookieAuth: { type: 'apiKey', in: 'cookie', name: 'fsp_sid', description: 'Обычная веб-сессия после входа на сайте' },
       },
       schemas: {
         Error: { type: 'object', required: ['error'], properties: { error: { type: 'string', example: 'Соревнование не найдено' }, code: { type: 'string' }, fields: { type: 'object' } } },

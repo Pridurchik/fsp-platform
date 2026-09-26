@@ -120,6 +120,46 @@ window.addEventListener('pageshow', () => {
   });
 });
 
+// Realtime notifications for the server-rendered web cabinet.
+// SSE is an enhancement: the cabinet remains usable when JS/SSE is unavailable.
+(function connectWebNotifications() {
+  const body = document.body;
+  if (!body || body.dataset.authenticated !== 'true' || !window.EventSource) return;
+  const source = new EventSource('/api/events');
+  const badge = () => document.querySelectorAll('.header-actions .badge, .mobile-actions .badge');
+  const showToast = (item) => {
+    const toast = document.createElement('div');
+    toast.className = 'flash flash-ok realtime-notification';
+    toast.setAttribute('role', 'status');
+    const link = item.link ? document.createElement('a') : null;
+    if (link) { link.href = item.link; link.textContent = item.title; toast.append(link); }
+    else toast.textContent = item.title;
+    if (item.body) {
+      const text = document.createElement('span');
+      text.textContent = ` — ${item.body}`;
+      toast.append(text);
+    }
+    document.body.prepend(toast);
+    window.setTimeout(() => toast.remove(), 8000);
+  };
+  source.addEventListener('notification', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const count = Number(data.unread);
+      const badges = badge();
+      if (Number.isFinite(count)) badges.forEach((current) => {
+        current.textContent = String(count);
+        current.setAttribute('aria-label', `непрочитанных уведомлений: ${count}`);
+      });
+      showToast(data.notification || {});
+    } catch { /* malformed events do not break the page */ }
+  });
+  source.onerror = () => {
+    // EventSource reconnects automatically. Polling on the next cabinet load remains fallback.
+  };
+  window.addEventListener('pagehide', () => source.close(), { once: true });
+})();
+
 // На серверной ошибке сразу переводим внимание к сводке или первому проблемному полю.
 const errorTarget = document.querySelector('[data-error-summary], [aria-invalid="true"]');
 if (errorTarget) {
