@@ -1,8 +1,10 @@
 import { all, get, run } from '../db/index.js';
+import { publish } from '../core/events.js';
 
 export function notify(userId, title, body = null, link = null) {
   if (!userId) return;
-  run('INSERT INTO notifications (user_id, title, body, link) VALUES (?, ?, ?, ?)', userId, title, body, link);
+  const { id } = run('INSERT INTO notifications (user_id, title, body, link) VALUES (?, ?, ?, ?)', userId, title, body, link);
+  publish('notification', { userId, id });
 }
 
 export const listNotifications = (userId, limit = 8) =>

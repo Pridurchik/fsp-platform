@@ -68,13 +68,13 @@ export function layout(ctx, { title = '', body, section = '', description = '' }
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title ? `${title} · ФСП РД` : 'ФСП РД: соревнования и рейтинг по спортивному программированию'}</title>
 <meta name="description" content="${description || 'Соревнования, заявки, результаты и рейтинг спортсменов Федерации спортивного программирования Республики Дагестан'}">
-<meta name="theme-color" content="#f5f5ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171b18" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#1b1c21">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="/static/brand.css">
 <script src="/static/app.js" defer></script>
 </head>
 <body>

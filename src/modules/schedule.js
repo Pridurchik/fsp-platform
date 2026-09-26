@@ -164,3 +164,22 @@ export function upcomingForUser(userId, now = new Date()) {
     userId, localStamp(now),
   ).map((s) => scheduleItemView(s, now));
 }
+
+// Старт и завершение соревнования: допущенным участникам — уведомление о старте, в чат — сообщение платформы.
+export function announceStatus(competitionId, status) {
+  const c = get('SELECT id, title FROM competitions WHERE id = ?', competitionId);
+  if (!c) return;
+  const chat = get('SELECT id FROM chats WHERE competition_id = ?', competitionId);
+  if (status === 'ONGOING') {
+    const next = all(
+      "SELECT * FROM schedule_items WHERE competition_id = ? AND starts_at > ? ORDER BY starts_at, id LIMIT 1",
+      competitionId, localStamp(new Date()),
+    )[0];
+    const hint = next ? `Далее: ${next.title} в ${next.starts_at.slice(11, 16)}.` : 'Следите за объявлениями в чате участников.';
+    for (const userId of approvedUsers(competitionId)) {
+      notify(userId, `Соревнование началось: ${c.title}`, `${hint} О каждом пункте расписания придёт уведомление.`, `/competitions/${competitionId}`);
+    }
+    if (chat) systemMessage(chat.id, `Соревнование началось. ${hint}`);
+  }
+  if (status === 'FINISHED' && chat) systemMessage(chat.id, 'Соревнование завершено. Итоги появятся после публикации организатором.');
+}

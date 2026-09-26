@@ -108,6 +108,8 @@ route('GET', '/api/v1/athletes/:id', api.athlete);
 
 // API мобильного приложения: JSON, вход по токену (Authorization: Bearer). Обработка в app.js → handleMobile.
 route('GET', '/api/mobile/config', mobile.config);
+route('GET', '/api/mobile/health', mobile.health);
+route('GET', '/api/mobile/events', mobile.events);
 route('POST', '/api/mobile/login', mobile.login);
 route('POST', '/api/mobile/demo-login', mobile.demoLogin);
 route('POST', '/api/mobile/register', mobile.register);
@@ -135,6 +137,7 @@ route('GET', '/api/mobile/notifications', mobile.notifications);
 route('POST', '/api/mobile/notifications/read', mobile.readNotifications);
 route('GET', '/api/mobile/profile', mobile.profile);
 route('POST', '/api/mobile/profile', mobile.saveProfile);
+route('POST', '/api/mobile/profile/rank', mobile.submitRank);
 route('GET', '/api/mobile/chats', mobile.chats);
 route('GET', '/api/mobile/chats/:id', mobile.chat);
 route('GET', '/api/mobile/chats/:id/messages', mobile.chatMessages);
@@ -142,6 +145,7 @@ route('POST', '/api/mobile/chats/:id/messages', mobile.sendMessage);
 route('GET', '/api/mobile/admin/overview', mobile.adminOverview);
 route('GET', '/api/mobile/admin/competitions/:id/registrations', mobile.adminRegistrations);
 route('POST', '/api/mobile/admin/registrations/:id/status', mobile.adminRegistrationStatus);
+route('POST', '/api/mobile/admin/competitions/:id/transition', mobile.adminTransition);
 route('POST', '/api/mobile/admin/competitions/:id/schedule', mobile.adminAddSchedule);
 route('POST', '/api/mobile/admin/schedule/:id', mobile.adminUpdateSchedule);
 route('POST', '/api/mobile/admin/schedule/:id/delete', mobile.adminDeleteSchedule);

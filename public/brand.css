@@ -1,0 +1,174 @@
+/* Фирменный стиль ФСП по брендбуку (fsp-russia.ru/press/brandbook).
+   Цвета: тёмный #1B1C21, светлый #EDEDED, синий #402FFF для действий, красный #EC1D35 как редкий акцент,
+   серые #C8C9CA и #D9D9D9 для светлых плашек. Шрифт: JetBrains Mono.
+   Графика: тонкие линии со скруглёнными углами и точками на концах, как на сайте ФСП.
+   Слой подключается после styles.css и переопределяет токены и ключевые компоненты. */
+
+:root:not([data-brand="off"]) {
+  color-scheme: dark;
+  --bg: #1b1c21;
+  --surface: #222328;
+  --surface-2: #2a2b31;
+  --surface-3: #33343b;
+  --border: #36373e;
+  --border-strong: #55565e;
+  --text: #ededed;
+  --text-2: #c8c9ca;
+  --text-3: #9d9ea4;
+  --primary: #402fff;
+  --primary-hover: #5445ff;
+  --primary-text: #9088ff;
+  --primary-soft: #26234a;
+  --accent: #ec1d35;
+  --accent-soft: #3b1c23;
+  --good: #5fd49a;
+  --good-soft: #1b3128;
+  --warn: #f2c14e;
+  --warn-soft: #362f19;
+  --bad: #ff6b7a;
+  --bad-soft: #3b1e25;
+  --live: #ec1d35;
+  --gold: #d8b554;
+  --gold-text: #2a1f00;
+  --silver: #aab2bd;
+  --silver-text: #1d2127;
+  --bronze: #c9956a;
+  --bronze-text: #2b1707;
+  --chip-bg: #d9d9d9;
+  --panel-light: #ededed;
+  --panel-light-text: #1b1c21;
+  --trace: #c8c9ca;
+  --font: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --shadow: none;
+  --shadow-hover: none;
+  --poster-paper: #402fff;
+  --poster-ink: #ffffff;
+}
+
+/* ---------- основа ---------- */
+
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.6; }
+input, select, textarea, button { font-family: var(--font); }
+h1, h2, h3, h4, .h3, .h4 { font-family: var(--font); color: var(--text); }
+h1 { font-weight: 500; letter-spacing: -0.035em; }
+h2 { font-weight: 500; letter-spacing: -0.03em; }
+h3, .h3 { font-weight: 500; letter-spacing: -0.02em; }
+a { color: var(--primary-text); }
+a:hover { color: #b3adff; }
+::selection { background: var(--primary); color: #fff; }
+:focus-visible { outline-color: var(--primary-text); }
+.eyebrow, .desk-label, .footer-head, .admin-label { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text-3); }
+
+/* ---------- шапка: светлая плашка, как на fsp-russia.ru ---------- */
+
+.site-header { background: transparent; border: 0; padding-top: 12px; }
+.site-header .header-row {
+  background: color-mix(in srgb, var(--panel-light) 96%, transparent);
+  color: var(--panel-light-text);
+  border-radius: var(--radius);
+  padding-inline: 22px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.site-header .fsp-logo { color: var(--panel-light-text); }
+.site-header .brand-region { color: #55565e; border-left-color: #b9bac0; }
+.main-nav a { color: var(--panel-light-text); font-size: 14px; }
+.main-nav a:hover { color: var(--primary); background: transparent; }
+.main-nav a.is-active { color: var(--primary); box-shadow: inset 0 -2px var(--primary); background: transparent; }
+.site-header .btn-ghost { color: var(--panel-light-text); border-color: #9d9ea4; background: transparent; }
+.site-header .btn-ghost:hover { border-color: var(--panel-light-text); background: rgb(27 28 33 / 6%); color: var(--panel-light-text); }
+.site-header .badge { background: #fff; color: var(--primary); }
+.mobile-menu summary span { background: var(--panel-light-text); }
+.mobile-panel { background: var(--surface); border-color: var(--border); }
+.mobile-panel nav a { color: var(--text); }
+.mobile-panel nav a.is-active { background: var(--primary-soft); color: var(--text); }
+.admin-bar { background: transparent; border-bottom: 1px solid var(--border); }
+
+/* ---------- кнопки и метки ---------- */
+
+.btn, .btn-accent { background: var(--primary); border-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: 500; }
+.btn:hover, .btn-accent:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--text-2); color: var(--text); }
+.btn-link { color: var(--primary-text); }
+.text-action { color: var(--text); text-decoration-color: var(--primary); }
+
+/* Даты, уровни и метки: серые «таблетки» с синим текстом из брендбука */
+.chip { background: transparent; border: 1px solid var(--border-strong); color: var(--text-2); border-radius: var(--radius-sm); }
+.chip-level, .chip-brand { background: var(--chip-bg); border-color: var(--chip-bg); color: var(--primary); }
+.pill { border-radius: var(--radius-sm); }
+.pill-brand { background: var(--chip-bg); color: var(--primary); }
+.tab { color: var(--text-2); }
+.tab.is-active { background: var(--chip-bg); color: var(--primary); }
+.tab.is-active .tab-count { color: var(--primary); }
+.agenda-item > time b, .date-day { color: var(--text); }
+.bulletin time, .news-card time, .news-feed time {
+  display: inline-block; padding: 3px 10px; border-radius: var(--radius-sm);
+  background: var(--chip-bg); color: var(--primary); font-size: 12px;
+}
+
+/* ---------- формы и поверхности ---------- */
+
+.input { background-color: var(--surface); border-color: var(--border-strong); color: var(--text); }
+.input:hover { border-color: var(--text-3); }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(64 47 255 / 35%); }
+.panel, .side-panel, .table-wrap, .facts, .auth-card, .task-card, .about-row, .card-list, .calendar-list, .news-list, .doc-list, .faq, .tile, .stat-tile, .todo {
+  background: var(--surface); border-color: var(--border);
+}
+.auth-card { border-top: 3px solid var(--primary); }
+table.data th { background: var(--surface-2); color: var(--text-3); }
+table.data tbody tr:hover { background: var(--surface-2); }
+table.data tr.is-me { background: var(--primary-soft); }
+.tile-main { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tile-main .tile-value, .tile-main .tile-label, .tile-main .tile-sub { color: #fff; }
+.site-footer { background: #17181c; border-top: 1px solid var(--border); }
+
+/* ---------- главная ---------- */
+
+.event-copy h1 { font-size: clamp(28px, 3vw, 42px); letter-spacing: -0.04em; font-weight: 500; }
+.event-poster { border-radius: var(--radius); }
+.poster-top, .poster-bottom { border-color: rgb(255 255 255 / 30%); }
+.poster-day { font-weight: 500; letter-spacing: -0.08em; }
+
+/* Ближайшие старты: вертикальная линия с узлами, как лента событий на сайте ФСП */
+.agenda-list { position: relative; }
+.agenda-item { position: relative; padding-left: 30px; }
+.agenda-item::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+.agenda-item::after { content: ""; position: absolute; left: 1px; top: 26px; width: 9px; height: 9px; border-radius: 50%; background: var(--bg); border: 1px solid var(--trace); }
+.agenda-item:first-child::before { top: 26px; }
+.agenda-item:last-child::before { bottom: auto; height: 26px; }
+
+/* Блок участия: сплошной синий, как новостные карточки ФСП */
+.join-desk { background: var(--primary); color: #fff; }
+.join-desk h2, .join-steps b { color: #fff; }
+.join-desk .desk-label, .join-copy p, .join-steps span { color: rgb(255 255 255 / 82%); }
+.join-steps li { border-top-color: rgb(255 255 255 / 30%); }
+.join-steps li::before { color: rgb(255 255 255 / 65%); }
+.join-desk .btn { background: var(--panel-light); border-color: var(--panel-light); color: var(--panel-light-text); }
+.join-desk .btn:hover { background: #fff; border-color: #fff; color: var(--primary); }
+
+/* О Федерации: линия-«дорожка» со скруглённым углом и точкой на старте */
+.about-desk {
+  position: relative; border-top: 0; margin-top: 56px; padding: 30px 36px 38px 40px;
+  border-left: 1px solid var(--trace); border-bottom: 1px solid var(--trace); border-bottom-left-radius: 56px;
+}
+.about-desk::before { content: ""; position: absolute; left: -5px; top: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--bg); border: 1px solid var(--trace); }
+.discipline-grid { border-top-color: var(--border-strong); }
+
+/* ---------- контест ---------- */
+
+.contest-status { background: var(--surface-2); }
+.contest-status.is-live { background: var(--primary-soft); }
+.task-letter { background: var(--primary); color: #fff; }
+.answer { background: var(--surface-2); color: var(--text); }
+.attempts li { background: var(--surface-2); }
+.sample-account { background: var(--surface); border-color: var(--border); color: var(--text); }
+.sample-account:hover { border-color: var(--primary-text); }
+
+@media (max-width: 800px) {
+  .site-header { padding-top: 8px; }
+  .site-header .header-row { padding-inline: 14px; }
+  .about-desk { padding: 24px 20px 30px 24px; border-bottom-left-radius: 36px; }
+}

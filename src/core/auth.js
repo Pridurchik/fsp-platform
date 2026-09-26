@@ -59,3 +59,28 @@ export function safeEqual(a, b) {
 }
 
 export const isOrganizer = (user) => Boolean(user && (user.role === 'ORGANIZER' || user.role === 'ADMIN'));
+
+// Защита от перебора паролей: не больше 10 неудачных попыток за 15 минут для пары «адрес + почта».
+const LOGIN_WINDOW_MS = 15 * 60_000;
+const LOGIN_LIMIT = 10;
+const loginAttempts = new Map();
+
+export const loginKey = (req, email) => `${req.socket?.remoteAddress || ''}|${String(email).toLowerCase()}`;
+
+export function loginBlocked(key) {
+  const a = loginAttempts.get(key);
+  if (!a) return false;
+  if (Date.now() - a.first > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return false;
+  }
+  return a.count >= LOGIN_LIMIT;
+}
+
+export function loginFailed(key) {
+  const a = loginAttempts.get(key);
+  if (!a || Date.now() - a.first > LOGIN_WINDOW_MS) loginAttempts.set(key, { first: Date.now(), count: 1 });
+  else a.count += 1;
+}
+
+export const loginSucceeded = (key) => loginAttempts.delete(key);

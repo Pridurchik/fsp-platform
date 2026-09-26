@@ -2,6 +2,7 @@
 import { all, get, run, tx } from '../db/index.js';
 import { todayISO, fmtDate, isISODate } from '../core/dates.js';
 import { audit } from './notifications.js';
+import { announceStatus } from './schedule.js';
 
 export const STATUS_LABELS = {
   DRAFT: 'Черновик',
@@ -207,6 +208,8 @@ export function applyTransition(id, action, userId) {
     if (action === 'reopen') run('UPDATE competitions SET results_published_at = NULL WHERE id = ?', id);
     run("UPDATE competitions SET status = ?, updated_at = datetime('now') WHERE id = ?", t.to, id);
     audit(userId, `STATUS_${t.to}`, 'competition', id, { from: c.status, to: t.to });
+    // Хакатон начался или закончился: участники узнают об этом в уведомлениях и в чате.
+    if (t.to === 'ONGOING' || t.to === 'FINISHED') announceStatus(id, t.to);
   });
   return { ok: true, to: t.to, label: t.label };
 }

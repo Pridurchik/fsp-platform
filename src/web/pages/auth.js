@@ -3,7 +3,9 @@ import { html } from '../../core/html.js';
 import { layout } from '../layout.js';
 import * as ui from '../ui.js';
 import { get, run } from '../../db/index.js';
-import { hashPassword, verifyPassword, createSession, destroySession, SESSION_COOKIE } from '../../core/auth.js';
+import {
+  hashPassword, verifyPassword, createSession, destroySession, SESSION_COOKIE, loginKey, loginBlocked, loginFailed, loginSucceeded,
+} from '../../core/auth.js';
 import { needsSetup, isSetupToken, finishSetup } from '../../core/setup.js';
 import { audit } from '../../modules/notifications.js';
 import { readRegistration, validateRegistration, createAthleteAccount } from '../../modules/athletes.js';
@@ -74,10 +76,16 @@ export function login(ctx) {
   const email = String(ctx.form.get('email') || '').trim().toLowerCase();
   const password = String(ctx.form.get('password') || '');
   const next = safeNext(ctx.form.get('next'), '');
+  const key = loginKey(ctx.req, email);
+  if (loginBlocked(key)) {
+    return ctx.html(loginPage(ctx, { email, next, error: 'Слишком много попыток входа. Попробуйте через 15 минут.' }), 429);
+  }
   const user = get('SELECT * FROM users WHERE email = ?', email);
   if (!user || !verifyPassword(password, user.password_hash)) {
+    loginFailed(key);
     return ctx.html(loginPage(ctx, { email, next, error: 'Неверная почта или пароль. Проверьте раскладку и попробуйте ещё раз.' }), 400);
   }
+  loginSucceeded(key);
   startSession(ctx, user.id);
   ctx.redirect(next || homeFor(user.role));
 }

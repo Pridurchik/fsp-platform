@@ -2,11 +2,18 @@
 // участников и расписание хакатонов. Вход по токену: POST /api/mobile/login возвращает token,
 // дальше он передаётся в заголовке Authorization: Bearer <token>.
 import { get, all } from '../../db/index.js';
-import { verifyPassword, createSession, destroySession, isOrganizer } from '../../core/auth.js';
+import {
+  verifyPassword, createSession, destroySession, isOrganizer, loginKey, loginBlocked, loginFailed, loginSucceeded,
+} from '../../core/auth.js';
+import { subscribe } from '../../core/events.js';
+import { readFileSync } from 'node:fs';
+import { ROOT } from '../../config.js';
+import path from 'node:path';
 import { todayISO, fmtDate, fmtRange, fmtMonthYear, fmtDateTime, addMonths, ageYears } from '../../core/dates.js';
 import { fullName, initials, plural } from '../../core/format.js';
 import {
   listCompetitions, getCompetition, eventsOf, registrationInfo, PHASES, phaseOf, phaseCounts, FORMAT_LABELS, STATUS_LABELS,
+  TRANSITIONS, applyTransition,
 } from '../../modules/competitions.js';
 import {
   applyToEvent, withdrawRegistration, athleteRegistrationsFor, athleteRegistrations, competitionRegistrations,
@@ -22,7 +29,7 @@ import {
 } from '../../modules/dictionaries.js';
 import {
   getAthlete, athleteByUser, athleteDisciplines, rankHistory, validateProfile, updateAthleteProfile,
-  readRegistration, validateRegistration, createAthleteAccount,
+  readRegistration, validateRegistration, createAthleteAccount, validateRank, submitRankRequest, RANK_STATUS_LABELS,
 } from '../../modules/athletes.js';
 import { listNews, getNews, listDocuments, DOC_CATEGORIES } from '../../modules/content.js';
 import { listNotifications, unreadCount, markAllRead } from '../../modules/notifications.js';
@@ -33,6 +40,7 @@ import {
 } from '../../modules/contests.js';
 import {
   openChat, canUseChat, listMessages, postMessage, markRead, userChats, unreadChats, athleteMembersCount, chatMembers, chatOf,
+  isMember, messageById,
 } from '../../modules/chats.js';
 import {
   SCHEDULE_KINDS, listSchedule, scheduleNow, readScheduleInput, validateScheduleItem, addScheduleItem, updateScheduleItem,
@@ -265,10 +273,14 @@ function respondWithSession(ctx, userId, status = 200) {
 export function login(ctx) {
   const email = text(ctx.body.email, 200).toLowerCase();
   const password = String(ctx.body.password || '');
+  const key = loginKey(ctx.req, email);
+  if (loginBlocked(key)) return fail(ctx, 429, 'Слишком много попыток входа. Попробуйте через 15 минут.');
   const user = get('SELECT * FROM users WHERE email = ?', email);
   if (!user || !verifyPassword(password, user.password_hash)) {
+    loginFailed(key);
     return fail(ctx, 400, 'Неверная почта или пароль. Проверьте раскладку и попробуйте ещё раз.');
   }
+  loginSucceeded(key);
   respondWithSession(ctx, user.id);
 }
 
@@ -304,6 +316,48 @@ export function me(ctx) {
   ctx.json(meDto(ctx));
 }
 
+const VERSION = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+
+export function health(ctx) {
+  ctx.json({ ok: true, version: VERSION, time: new Date().toISOString(), database: Boolean(get('SELECT 1 AS x')) });
+}
+
+// Живой поток событий (Server-Sent Events): новые уведомления и сообщения чатов приходят сразу.
+// Приложение держит его открытым, пока запущено; при обрыве переподключается, опрос остаётся запасным путём.
+export function events(ctx) {
+  if (!needUser(ctx)) return;
+  const { req, res, user } = ctx;
+  const organizer = ctx.isOrganizer;
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+  });
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  send('ready', { unread: unreadCount(user.id), unreadChats: unreadChats(user) });
+  const unsubscribe = subscribe((e) => {
+    try {
+      if (e.type === 'notification' && e.userId === user.id) {
+        const n = get('SELECT * FROM notifications WHERE id = ?', e.id);
+        if (n) send('notification', { notification: notificationDto(n), unread: unreadCount(user.id) });
+      } else if (e.type === 'chat' && (organizer || isMember(e.chatId, user.id))) {
+        const m = messageById(e.messageId);
+        if (m) send('message', { competitionId: e.competitionId, message: messageDto(m, user) });
+      } else if (e.type === 'membership' && e.userId === user.id) {
+        send('chats', { competitionId: e.competitionId });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  });
+  const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
+  req.on('close', () => {
+    clearInterval(ping);
+    unsubscribe();
+  });
+}
+
 // ---------- главная и соревнования ----------
 
 export function home(ctx) {
@@ -315,6 +369,7 @@ export function home(ctx) {
   const cfg = getRatingConfig();
   const site = getSettings();
   ctx.json({
+    myEvents: myEvents(ctx),
     orgName: site.org_name,
     about: site.about ? site.about.split(/\n\s*\n/)[0] : null,
     featured: featured ? { ...competitionCard(featured), label: featured.status === 'ONGOING' ? 'Соревнование идёт' : 'Ближайший старт' } : null,
@@ -322,6 +377,39 @@ export function home(ctx) {
     news: listNews(3).map((n) => newsDto(n)),
     leaders: leaderboard({ limit: 5 }).rows.map((r) => leaderDto(ctx, r, cfg)),
     disciplines: listDisciplines().map((d) => ({ code: d.code, name: d.name, short: d.short_name, info: DISCIPLINE_INFO[d.code] || null })),
+  });
+}
+
+// «Мои хакатоны» на главной: куда спортсмен допущен, а организатору — идущие соревнования.
+function myEvents(ctx) {
+  if (!ctx.user) return [];
+  let list;
+  if (ctx.isOrganizer) {
+    list = listCompetitions({ phase: 'current' });
+  } else if (ctx.athlete) {
+    const ids = new Set(
+      all(
+        `SELECT DISTINCT e.competition_id AS id FROM registrations r JOIN competition_events e ON e.id = r.event_id
+          WHERE r.athlete_id = ? AND r.status = 'APPROVED'`,
+        ctx.athlete.id,
+      ).map((r) => r.id),
+    );
+    list = [...listCompetitions({ phase: 'current' }), ...listCompetitions({ phase: 'upcoming' })].filter((c) => ids.has(c.id));
+  } else {
+    return [];
+  }
+  return list.slice(0, 5).map((c) => {
+    const chat = chatOf(c.id);
+    const items = listSchedule(c.id);
+    const past = items.filter((s) => s.is_past).length;
+    return {
+      ...competitionCard(c),
+      now: scheduleNowDto(c.id),
+      scheduleTotal: items.length,
+      schedulePassed: past,
+      chatUnread: chat && canUseChat(ctx.user, c.id) ? unreadInChat(ctx.user, chat.id) : 0,
+      chatMembers: chat ? athleteMembersCount(chat.id) : 0,
+    };
   });
 }
 
@@ -504,9 +592,33 @@ export function competition(ctx) {
           pending: registrations.filter((r) => r.status === 'SUBMITTED').length,
           approved: registrations.filter((r) => r.status === 'APPROVED').length,
           total: registrations.length,
+          transitions: adminTransitions(c.status),
         }
       : null,
   });
+}
+
+// Статусы, которые организатор меняет из приложения. Публикация итогов — на сайте: там проверка протокола.
+const APP_ACTIONS = ['publish', 'start', 'finish', 'cancel', 'unpublish'];
+const adminTransitions = (status) =>
+  (TRANSITIONS[status] || [])
+    .filter((t) => APP_ACTIONS.includes(t.action))
+    .map((t) => ({ action: t.action, label: t.label, hint: t.hint || null, danger: Boolean(t.danger) }));
+
+export function adminTransition(ctx) {
+  if (!needOrganizer(ctx)) return;
+  const action = text(ctx.body.action, 30);
+  if (!APP_ACTIONS.includes(action)) return fail(ctx, 400, 'Это действие доступно только на сайте');
+  const r = applyTransition(idParam(ctx), action, ctx.user.id);
+  if (r.error) return fail(ctx, 400, r.error);
+  const messages = {
+    ONGOING: 'Соревнование началось. Допущенные участники получили уведомление, пункты расписания будут приходить им по времени.',
+    FINISHED: 'Соревнование завершено. Внесите и опубликуйте итоги на сайте.',
+    PUBLISHED: 'Соревнование опубликовано, регистрация откроется по датам.',
+    DRAFT: 'Соревнование возвращено в черновик.',
+    CANCELLED: 'Соревнование отменено.',
+  };
+  ctx.json({ ok: true, status: r.to, message: messages[r.to] || r.label });
 }
 
 function unreadInChat(user, chatId) {
@@ -766,6 +878,7 @@ export function cabinet(ctx) {
       competitionId: reg.competition_id,
       title: reg.title,
       dates: fmtRange(reg.start_date, reg.end_date),
+      startDate: reg.start_date,
       discipline: reg.discipline_short,
       status: reg.status,
       statusLabel: REG_STATUS_LABELS[reg.status],
@@ -829,7 +942,35 @@ export function profile(ctx) {
     municipalities: listMunicipalities().map((m) => ({ id: m.id, name: m.name })),
     organizations: listOrganizations().map((o) => ({ id: o.id, name: o.name, municipality: o.municipality })),
     disciplines: listDisciplines().map((d) => ({ id: d.id, name: d.name, short: d.short_name })),
+    ranks: listRanks().map((r) => ({ id: r.id, name: r.name, short: r.short_name, kind: r.kind, bonus: r.bonus_points })),
+    rankHistory: rankHistory(a.id).map((r) => ({
+      id: r.id,
+      name: r.rank_name,
+      status: r.status,
+      statusLabel: RANK_STATUS_LABELS[r.status],
+      orderNumber: r.order_number,
+      assigned: fmtDate(r.assigned_at),
+      validUntil: r.valid_until ? fmtDate(r.valid_until) : null,
+    })),
   });
+}
+
+// Заявка на разряд: учитывается в рейтинге после проверки организатором, как на сайте.
+export function submitRank(ctx) {
+  if (!needAthlete(ctx)) return;
+  const r = {
+    rank_id: Number(ctx.body.rankId) || null,
+    assigned_at: text(ctx.body.assignedAt, 10),
+    valid_until: text(ctx.body.validUntil, 10) || null,
+    order_number: text(ctx.body.orderNumber, 60) || null,
+  };
+  const errors = validateRank(r);
+  if (Object.keys(errors).length) {
+    const map = { rank_id: 'rankId', assigned_at: 'assignedAt', valid_until: 'validUntil', order_number: 'orderNumber' };
+    return fail(ctx, 400, Object.values(errors)[0], { fields: Object.fromEntries(Object.entries(errors).map(([k, v]) => [map[k] || k, v])) });
+  }
+  submitRankRequest(ctx.athlete.id, r);
+  ctx.json({ ok: true, message: 'Разряд отправлен на проверку. Бонус появится в рейтинге после подтверждения.' }, 201);
 }
 
 export function saveProfile(ctx) {
@@ -868,6 +1009,7 @@ export function chats(ctx) {
       dates: fmtRange(c.start_date, c.end_date),
       members: c.members,
       unread: c.unread,
+      isHackathon: Boolean(get("SELECT 1 AS x FROM competition_events e JOIN disciplines d ON d.id = e.discipline_id WHERE e.competition_id = ? AND d.code = 'PRODUCT'", c.competition_id)) || hasSchedule(c.competition_id),
       last: c.last ? { ...messageDto(c.last, ctx.user), preview: c.last.body.length > 120 ? `${c.last.body.slice(0, 120)}…` : c.last.body } : null,
     })),
     hint: ctx.isOrganizer

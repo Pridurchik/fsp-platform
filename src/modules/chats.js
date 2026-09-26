@@ -4,6 +4,7 @@
 import { all, get, run, tx } from '../db/index.js';
 import { isOrganizer } from '../core/auth.js';
 import { notify } from './notifications.js';
+import { publish } from '../core/events.js';
 
 export const MESSAGE_MAX = 2000;
 
@@ -23,10 +24,18 @@ export function memberName(a) {
 
 export function systemMessage(chatId, body, createdAt = null) {
   if (createdAt) return run('INSERT INTO chat_messages (chat_id, user_id, body, created_at) VALUES (?, NULL, ?, ?)', chatId, body, createdAt).id;
-  return run('INSERT INTO chat_messages (chat_id, user_id, body) VALUES (?, NULL, ?)', chatId, body).id;
+  const id = run('INSERT INTO chat_messages (chat_id, user_id, body) VALUES (?, NULL, ?)', chatId, body).id;
+  publishMessage(chatId, id);
+  return id;
 }
 
-const isMember = (chatId, userId) => Boolean(get('SELECT 1 AS x FROM chat_members WHERE chat_id = ? AND user_id = ?', chatId, userId));
+// Новое сообщение сразу уходит подписанным приложениям участников чата.
+function publishMessage(chatId, messageId) {
+  const chat = get('SELECT competition_id FROM chats WHERE id = ?', chatId);
+  if (chat) publish('chat', { chatId, competitionId: chat.competition_id, messageId });
+}
+
+export const isMember = (chatId, userId) => Boolean(get('SELECT 1 AS x FROM chat_members WHERE chat_id = ? AND user_id = ?', chatId, userId));
 
 // Привести членство спортсмена в чате к его заявкам на соревнование.
 // notifyUser: false — без уведомления (спортсмен сам присоединился к идущему контесту).
@@ -45,6 +54,7 @@ export function syncMembership(competitionId, athleteId, { notifyUser = true, qu
 
   if (approved && !member) {
     run('INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)', chat.id, a.user_id);
+    if (!quiet) publish('membership', { userId: a.user_id, competitionId });
     if (!quiet) {
       systemMessage(chat.id, `Новый участник: ${memberName(a)}`);
       if (notifyUser) {
@@ -61,6 +71,7 @@ export function syncMembership(competitionId, athleteId, { notifyUser = true, qu
   }
   if (!approved && member) {
     run('DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?', chat.id, a.user_id);
+    publish('membership', { userId: a.user_id, competitionId });
     return 'left';
   }
   return null;
@@ -136,6 +147,7 @@ export function postMessage(user, competitionId, rawBody) {
   const { chat, competition } = opened;
   const id = run('INSERT INTO chat_messages (chat_id, user_id, body) VALUES (?, ?, ?)', chat.id, user.id, body).id;
   markRead(chat.id, user.id, id);
+  publishMessage(chat.id, id);
   // Сообщение организатора — объявление: участники получают уведомление.
   if (isOrganizer(user)) {
     const members = all(
@@ -194,3 +206,8 @@ export function unreadChats(user) {
   if (!user) return 0;
   return userChats(user).reduce((sum, c) => sum + (c.unread > 0 ? 1 : 0), 0);
 }
+
+export const messageById = (id) => {
+  const m = get(`${MESSAGE_SQL} WHERE m.id = ?`, id);
+  return m ? withAuthor(m) : null;
+};
