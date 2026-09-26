@@ -1,0 +1,9 @@
+# Контекст сборки: без базы, истории git и мусора.
+.git
+node_modules
+data/
+*.sqlite*
+*.sqlite-*
+backup/
+.DS_Store
+*.log

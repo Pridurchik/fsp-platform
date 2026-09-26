@@ -1,0 +1,20 @@
+# Платформа ФСП РД под классическим Docker (проверено для Debian-хоста).
+# База SQLite хранится в именованном volume fsp-data и переживает пересборку.
+services:
+  fsp:
+    build: .
+    image: fsp-platform:latest
+    container_name: fsp-platform
+    ports:
+      - "3000:3000"
+    volumes:
+      - fsp-data:/app/data
+    environment:
+      PORT: "3000"
+      HOST: "::"
+      # PUBLIC_URL: "https://fsp-rd.ru"
+      # SECURE_COOKIES: "1"
+    restart: unless-stopped
+
+volumes:
+  fsp-data:

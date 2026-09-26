@@ -56,6 +56,28 @@ npm run sample
 
 Резервная копия: остановите сервер и скопируйте файл базы (`data/fsp.sqlite`).
 
+## Запуск в Docker
+
+Нужны классический Docker Engine и плагин Compose на Debian-хосте. Образ на `node:22-bookworm-slim`, `npm install` не выполняется — у проекта нет зависимостей. База живёт в volume `fsp-data` и переживает пересборку.
+
+```bash
+docker compose up -d --build   # собрать и запустить на http://localhost:3000
+docker compose logs -f         # логи; при первом запуске там ссылка настройки
+docker compose exec fsp npm test      # тесты внутри контейнера
+docker compose exec fsp npm run sample # пример наполнения (пересоздаёт базу в volume)
+docker compose exec fsp npm run reset  # чистая база: только справочники
+```
+
+Обновление: `git pull && docker compose up -d --build`. Переменные (`PUBLIC_URL`, `SECURE_COOKIES`) задаются в `docker-compose.yml`.
+
+Резервная копия базы из volume (имя volume уточнить через `docker volume ls`):
+
+```bash
+docker compose stop fsp
+docker run --rm -v fsp-platform_fsp-data:/data -v "$PWD/backup:/backup" debian:bookworm-slim cp /data/fsp.sqlite /backup/fsp-$(date +%F).sqlite
+docker compose start fsp
+```
+
 ## Кейс №2: проведение соревнований на платформе
 
 Соревнование можно провести прямо на сайте: организатор создаёт контест, добавляет задания и запускает его, спортсмен отправляет решения, организатор проверяет, таблица результатов строится сама, а итог попадает в профиль и рейтинг.
