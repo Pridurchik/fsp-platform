@@ -220,6 +220,38 @@ export function openApiSpec() {
           responses: { 200: { description: 'OK' }, 400: { description: 'Профиль неполный или заявка уже есть', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } } },
         },
       },
+      '/api/mobile/competitions/{id}/teams': {
+        get: {
+          tags: ['mobile-public'], summary: 'Составы команд соревнования; состав участников виден публично, код приглашения — только своей команде',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          security: [{ bearerAuth: [] }],
+          responses: { 200: { description: 'Составы команд и лимиты' }, 404: { description: 'Соревнование не найдено' } },
+        },
+      },
+      '/api/mobile/competitions/{id}/team': {
+        post: {
+          tags: ['mobile-athlete'], summary: 'Создать команду и получить код приглашения', security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['name'], properties: { name: { type: 'string', minLength: 2, maxLength: 60 } } } } } },
+          responses: { 200: { description: 'Создана команда с капитаном и inviteCode' }, 400: { description: 'Нет регистрации или нарушены условия' }, 401: { description: 'Нужен вход спортсмена' } },
+        },
+      },
+      '/api/mobile/competitions/{id}/team/join': {
+        post: {
+          tags: ['mobile-athlete'], summary: 'Вступить в команду по invite-коду', security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer', description: 'Проверяется, что код относится именно к этому соревнованию' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['code'], properties: { code: { type: 'string', minLength: 8, maxLength: 16 } } } } } },
+          responses: { 200: { description: 'Участник добавлен' }, 400: { description: 'Код неверен, команда заполнена или условия не соблюдены' } },
+        },
+      },
+      '/api/mobile/competitions/{id}/team/leave': {
+        post: {
+          tags: ['mobile-athlete'], summary: 'Выйти из команды', security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }],
+          requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['teamId'], properties: { teamId: { type: 'integer' } } } } } },
+          responses: { 200: { description: 'Участник вышел, капитанство передано при необходимости' }, 400: { description: 'Команда не найдена или участник не состоит в ней' } },
+        },
+      },
       '/api/mobile/competitions/{id}/join': {
         post: {
           tags: ['mobile-athlete'],

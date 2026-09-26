@@ -6,6 +6,7 @@ import { all, get, run, tx } from '../db/index.js';
 import { getCompetition } from './competitions.js';
 import { isProfileComplete } from './registrations.js';
 import { checkAgeAndRank } from './eligibility.js';
+import { registrationInfo } from './competitions.js';
 
 export function myTeamIn(competitionId, athleteId) {
   return (
@@ -71,6 +72,7 @@ export function createTeam(athlete, competitionId, name) {
   if (!c || c.status === 'DRAFT') return { error: 'Соревнование не найдено', competitionId };
   if (!(c.max_team_size > 1)) return { error: 'Командное участие здесь не предусмотрено', competitionId };
   if (c.status === 'CANCELLED') return { error: 'Соревнование отменено', competitionId };
+  if (!registrationInfo(c).open) return { error: 'Создать команду можно только во время регистрации', competitionId };
   if (!isProfileComplete(athlete)) return { error: 'profile', competitionId };
   const bad = checkAgeAndRank(athlete, c);
   if (bad) return { ...bad, competitionId };
@@ -91,12 +93,16 @@ export function createTeam(athlete, competitionId, name) {
   });
 }
 
-export function joinTeamByCode(athlete, code) {
+export function joinTeamByCode(athlete, code, expectedCompetitionId = null) {
   const clean = String(code ?? '').trim().toUpperCase();
   const t = get('SELECT * FROM teams WHERE invite_code = ?', clean);
   if (!t) return { error: 'Команда с таким кодом не найдена' };
+  if (expectedCompetitionId != null && t.competition_id !== Number(expectedCompetitionId)) {
+    return { error: 'Код команды относится к другому соревнованию', competitionId: Number(expectedCompetitionId) };
+  }
   const c = getCompetition(t.competition_id);
   if (!c || c.status === 'CANCELLED') return { error: 'Соревнование недоступно', competitionId: t.competition_id };
+  if (!registrationInfo(c).open) return { error: 'Вступить в команду можно только во время регистрации', competitionId: t.competition_id };
   if (!isProfileComplete(athlete)) return { error: 'profile', competitionId: t.competition_id };
   const bad = checkAgeAndRank(athlete, c);
   if (bad) return { ...bad, competitionId: t.competition_id };
@@ -128,4 +134,22 @@ export function leaveTeam(athlete, teamId) {
     if (teamSize(teamId) === 0) run('DELETE FROM teams WHERE id = ?', teamId);
   });
   return { ok: true, competitionId: t.competition_id };
+}
+
+export function teamsForCompetition(competitionId, athleteId = null) {
+  const rows = all(
+    `SELECT t.id, t.competition_id, t.name, t.invite_code, COUNT(m.athlete_id) AS size,
+            MAX(CASE WHEN m.athlete_id = ? THEN 1 ELSE 0 END) AS is_member,
+            MAX(CASE WHEN m.athlete_id = ? AND m.is_captain = 1 THEN 1 ELSE 0 END) AS is_captain
+       FROM teams t LEFT JOIN team_members m ON m.team_id = t.id
+      WHERE t.competition_id = ? GROUP BY t.id ORDER BY t.name COLLATE NOCASE`,
+    athleteId, athleteId, competitionId,
+  );
+  const c = getCompetition(competitionId);
+  return rows.map((t) => ({
+    ...t,
+    invite_code: t.is_member ? t.invite_code : null,
+    members: teamMembers(t.id),
+    maxSize: c?.max_team_size ?? 1,
+  }));
 }

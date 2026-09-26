@@ -24,6 +24,7 @@ import { contestBlock, contestPanel } from './contests.js';
 import { scheduleList } from './hackathon.js';
 import { listSchedule } from '../../modules/schedule.js';
 import { canUseChat } from '../../modules/chats.js';
+import { myTeamIn, teamMembers, teamsForCompetition } from '../../modules/teams.js';
 import { errorPage } from './errors.js';
 
 const notFound = (ctx) => ctx.html(errorPage(ctx, 404), 404);
@@ -224,6 +225,8 @@ export function competition(ctx) {
   const results = c.status === 'RESULTS_PUBLISHED' && !k ? publishedResults(c.id) : [];
   const place = c.format === 'ONLINE' ? 'Дистанционно' : [c.city, c.venue].filter(Boolean).join(', ');
   const meta = competitionMeta(c.id);
+  const myTeam = ctx.athlete ? myTeamIn(c.id, ctx.athlete.id) : null;
+  const teamOptions = c.max_team_size > 1 ? teamsForCompetition(c.id, ctx.athlete?.id) : [];
 
   let panel;
   if (reg.open) {
@@ -298,6 +301,7 @@ export function competition(ctx) {
           ${place && c.format !== 'ONLINE' ? html`<div><dt>Место проведения</dt><dd>${place}</dd></div>` : ''}
           <div><dt>Регистрация</dt><dd>${c.reg_start || c.reg_end ? `${c.reg_start ? `с ${fmtDate(c.reg_start)} ` : ''}${c.reg_end ? `до ${fmtDate(c.reg_end)}` : ''}` : 'сроки не указаны'}</dd></div>
           <div><dt>Статус</dt><dd>${STATUS_LABELS[c.status]}</dd></div>
+          ${c.max_team_size > 1 ? html`<div><dt>Командный формат</dt><dd>${c.min_team_size}–${c.max_team_size} участников${c.allow_individual ? '; индивидуально тоже можно' : '; индивидуально нельзя'}</dd></div>` : ''}
           ${c.regulations_url ? html`<div><dt>Положение</dt><dd><a href="${c.regulations_url}">Открыть документ</a></dd></div>` : ''}
         </dl>
         ${meta.tags.length ? html`<div class="chips">${meta.tags.map((x) => ui.chip(x.name))}</div>` : ''}
@@ -305,9 +309,22 @@ export function competition(ctx) {
         ${c.rules_text ? html`<div class="page-readable"><h2 class="h3">Правила</h2>${paragraphs(c.rules_text)}</div>` : ''}
         ${c.description ? html`<div class="prose">${paragraphs(c.description)}</div>` : ''}
       </div>
-      <aside class="side-panel reg-panel ${reg.open || mine.length ? 'is-priority' : ''}" aria-label="${panelTitle}">
+      <aside id="participation" class="side-panel reg-panel ${reg.open || mine.length ? 'is-priority' : ''}" aria-label="${panelTitle}">
         <h2 class="h3">${panelTitle}</h2>
         ${panel}
+        ${ctx.athlete && c.max_team_size > 1 && reg.open ? html`<section class="team-controls">
+          <h3 class="h4">Команда</h3>
+          ${myTeam ? html`<p><b>${myTeam.name}</b> · ${teamMembers(myTeam.id).length}/${c.max_team_size}${myTeam.created_by === ctx.athlete.id ? html`<span class="sub">Капитан</span>` : ''}</p>
+            <p class="small">Код для приглашения: <code>${myTeam.invite_code}</code></p>
+            <form method="post" action="/competitions/${c.id}/team/leave">${ui.csrf(ctx)}<input type="hidden" name="team_id" value="${myTeam.id}"><button class="btn btn-ghost btn-sm" type="submit">Выйти из команды</button></form>`
+            : html`<form method="post" action="/competitions/${c.id}/team" class="form">${ui.csrf(ctx)}
+                ${ui.field({ label: 'Название новой команды', name: 'name', required: true, attrs: 'minlength="2" maxlength="60"' })}
+                <button class="btn btn-sm" type="submit">Создать команду</button></form>
+              <form method="post" action="/competitions/${c.id}/team/join" class="form">${ui.csrf(ctx)}
+                ${ui.field({ label: 'Код приглашения', name: 'code', required: true, attrs: 'maxlength="16" autocapitalize="characters"' })}
+                <button class="btn btn-ghost btn-sm" type="submit">Вступить по коду</button></form>`}
+          ${teamOptions.length ? html`<ul class="plain-list">${teamOptions.map((t) => html`<li>${t.name}<span class="sub">${t.size}/${t.maxSize} участников</span></li>`)}</ul>` : ''}
+        </section>` : ''}
         ${myList}
         ${chatBlock}
       </aside>

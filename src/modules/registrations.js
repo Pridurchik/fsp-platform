@@ -17,7 +17,7 @@ export const isProfileComplete = (a) => Boolean(a && a.municipality_id && a.orga
 export function applyToEvent(athlete, eventId) {
   const ev = get(
     `SELECT e.id, e.competition_id, c.status, c.reg_start, c.reg_end, c.title,
-            c.age_min, c.age_max, c.required_rank_id
+            c.age_min, c.age_max, c.required_rank_id, c.min_team_size, c.max_team_size, c.allow_individual
        FROM competition_events e JOIN competitions c ON c.id = e.competition_id WHERE e.id = ?`,
     eventId,
   );
@@ -33,6 +33,9 @@ export function applyToEvent(athlete, eventId) {
     ev.competition_id, athlete.id,
   );
   const teamId = team ? team.id : null;
+  if (ev.max_team_size > 1 && !ev.allow_individual && !teamId) {
+    return { error: 'Для этого соревнования нужно сначала создать команду или вступить в неё.', code: 'team', competitionId: ev.competition_id };
+  }
   const existing = get('SELECT * FROM registrations WHERE event_id = ? AND athlete_id = ?', eventId, athlete.id);
   if (existing) {
     if (existing.status !== 'WITHDRAWN') return { error: 'Вы уже подали заявку в эту дисциплину', competitionId: ev.competition_id };

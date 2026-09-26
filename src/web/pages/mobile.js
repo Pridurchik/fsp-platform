@@ -48,6 +48,7 @@ import {
 } from '../../modules/schedule.js';
 import { SAMPLE_ACCOUNTS, sampleLoaded } from './auth.js';
 import { CLOSED_PANEL } from './public.js';
+import { createTeam, joinTeamByCode, leaveTeam, myTeamIn, teamsForCompetition } from '../../modules/teams.js';
 
 const ACTIVE = ['SUBMITTED', 'APPROVED'];
 const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
@@ -556,6 +557,12 @@ export function competition(ctx) {
       statusLabel: REG_STATUS_LABELS[r.status],
       canWithdraw: ACTIVE.includes(r.status) && reg.open,
     })),
+    team: ctx.athlete ? (() => {
+      const t = myTeamIn(c.id, ctx.athlete.id);
+      return t ? { ...t, inviteCode: t.invite_code } : null;
+    })() : null,
+    teams: c.max_team_size > 1 ? teamsForCompetition(c.id, ctx.athlete?.id) : [],
+    teamParticipation: { minSize: c.min_team_size, maxSize: c.max_team_size, allowIndividual: Boolean(c.allow_individual) },
     isApproved: approved,
     chat: {
       available: chatAllowed,
@@ -637,6 +644,43 @@ export function apply(ctx) {
   if (r.code === 'birthdate') return fail(ctx, 400, r.error, { code: 'birthdate' });
   if (r.error) return fail(ctx, 400, r.error);
   ctx.json({ ok: true, message: 'Заявка подана. Когда организатор её одобрит, вас добавят в чат участников.' });
+}
+
+export function teamCreate(ctx) {
+  if (!needAthlete(ctx)) return;
+  const r = createTeam(ctx.athlete, idParam(ctx), ctx.body.name);
+  if (r.error) return fail(ctx, 400, r.error, { code: r.code });
+  ctx.json({ ok: true, teamId: r.teamId, inviteCode: r.inviteCode });
+}
+
+export function competitionTeams(ctx) {
+  const c = getCompetition(idParam(ctx));
+  if (!c || (c.status === 'DRAFT' && !ctx.isOrganizer)) return fail(ctx, 404, 'Соревнование не найдено');
+  ctx.json({
+    competitionId: c.id,
+    minSize: c.min_team_size,
+    maxSize: c.max_team_size,
+    allowIndividual: Boolean(c.allow_individual),
+    mine: ctx.athlete ? myTeamIn(c.id, ctx.athlete.id) : null,
+    items: c.max_team_size > 1 ? teamsForCompetition(c.id, ctx.athlete?.id).map((t) => ({
+      id: t.id, name: t.name, size: t.size, maxSize: t.maxSize, isMember: Boolean(t.is_member),
+      members: t.members.map((m) => ({ id: m.athlete_id, name: fullName(m), captain: Boolean(m.is_captain) })),
+    })) : [],
+  });
+}
+
+export function teamJoin(ctx) {
+  if (!needAthlete(ctx)) return;
+  const r = joinTeamByCode(ctx.athlete, ctx.body.code, idParam(ctx));
+  if (r.error) return fail(ctx, 400, r.error, { code: r.code });
+  ctx.json({ ok: true, teamId: r.teamId, competitionId: r.competitionId });
+}
+
+export function teamLeave(ctx) {
+  if (!needAthlete(ctx)) return;
+  const r = leaveTeam(ctx.athlete, Number(ctx.body.teamId));
+  if (r.error) return fail(ctx, 400, r.error);
+  ctx.json({ ok: true, competitionId: r.competitionId });
 }
 
 export function withdraw(ctx) {

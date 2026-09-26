@@ -6,6 +6,7 @@ import * as admin from './web/pages/admin.js';
 import * as api from './web/pages/api.js';
 import * as docs from './web/pages/docs.js';
 import * as contest from './web/pages/contests.js';
+import * as teams from './web/pages/teams.js';
 import * as hackathon from './web/pages/hackathon.js';
 import * as mobile from './web/pages/mobile.js';
 
@@ -34,6 +35,9 @@ route('GET', '/about', pub.about);
 // Модуль проведения соревнований (кейс №2): участие и отправка решений
 route('POST', '/competitions/:id/join', contest.join);
 route('POST', '/tasks/:id/submit', contest.submit);
+route('POST', '/competitions/:id/team', teams.create);
+route('POST', '/competitions/:id/team/join', teams.join);
+route('POST', '/competitions/:id/team/leave', teams.leave);
 
 // Хакатон: чат допущенных участников и расписание (организатор ведёт на вкладке соревнования)
 route('GET', '/competitions/:id/chat', hackathon.chatPage);
@@ -122,6 +126,10 @@ route('GET', '/api/mobile/home', mobile.home);
 route('GET', '/api/mobile/competitions', mobile.competitions);
 route('GET', '/api/mobile/competitions/:id', mobile.competition);
 route('POST', '/api/mobile/competitions/:id/apply', mobile.apply);
+route('GET', '/api/mobile/competitions/:id/teams', mobile.competitionTeams);
+route('POST', '/api/mobile/competitions/:id/team', mobile.teamCreate);
+route('POST', '/api/mobile/competitions/:id/team/join', mobile.teamJoin);
+route('POST', '/api/mobile/competitions/:id/team/leave', mobile.teamLeave);
 route('POST', '/api/mobile/competitions/:id/join', mobile.joinContestHandler);
 route('GET', '/api/mobile/competitions/:id/schedule', mobile.schedule);
 route('POST', '/api/mobile/registrations/:id/withdraw', mobile.withdraw);
