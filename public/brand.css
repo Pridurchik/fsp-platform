@@ -1,10 +1,67 @@
 /* Фирменный стиль ФСП по брендбуку (fsp-russia.ru/press/brandbook).
-   Цвета: тёмный #1B1C21, светлый #EDEDED, синий #402FFF для действий, красный #EC1D35 как редкий акцент,
-   серые #C8C9CA и #D9D9D9 для светлых плашек. Шрифт: JetBrains Mono.
-   Графика: тонкие линии со скруглёнными углами и точками на концах, как на сайте ФСП.
-   Слой подключается после styles.css и переопределяет токены и ключевые компоненты. */
+   Синий #402FFF для действий и красный #EC1D35 как редкий акцент общие для обеих тем.
+   Светлая тема (по умолчанию): тёмный #1B1C21 для текста, серый #C8C9CA для линий и границ.
+   Тёмная тема: светлый #EDEDED для текста на фоне #1B1C21. Шапка в обеих темах белая с тёмными элементами.
+   Шрифт: JetBrains Mono. Графика: тонкие линии со скруглёнными углами и точками на концах, как на сайте ФСП.
+   Слой подключается после styles.css и переопределяет токены и ключевые компоненты.
+   Переключение тем — только цвета: разметка и вёрстка у тем одинаковые. */
+
+/* ---------- токены: светлая тема (по умолчанию) ---------- */
 
 :root:not([data-brand="off"]) {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --surface-3: #ededed;
+  --border: #e3e3e5;
+  --border-strong: #c8c9ca;
+  --text: #1b1c21;
+  --text-2: #4c4d54;
+  --text-3: #6b6c73;
+  --primary: #402fff;
+  --primary-hover: #2b1fd0;
+  --primary-text: #402fff;
+  --primary-soft: #eeecff;
+  --accent: #ec1d35;
+  --accent-soft: #fdeaec;
+  --good: #0e7a4d;
+  --good-soft: #e3f4ec;
+  --warn: #8a5a00;
+  --warn-soft: #fbf0d9;
+  --bad: #c2142a;
+  --bad-soft: #fdeaec;
+  --live: #ec1d35;
+  --gold: #d8b554;
+  --gold-text: #2a1f00;
+  --silver: #d3d5d9;
+  --silver-text: #1d2127;
+  --bronze: #c9956a;
+  --bronze-text: #2b1707;
+  --chip-bg: #ededed;
+  --panel-light: #c8c9ca;
+  --panel-light-text: #1b1c21;
+  /* Плашка шапки: в обеих темах белая с тёмными элементами, как на fsp-russia.ru */
+  --bar-bg: #ffffff;
+  --bar-fg: #1b1c21;
+  --bar-line: #9d9ea4;
+  --bar-muted: #55565e;
+  --bar-rule: #b9bac0;
+  --link-hover: #2b1fd0;
+  --footer-bg: #f4f4f5;
+  --trace: #c8c9ca;
+  --font: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 2px rgb(27 28 33 / 6%), 0 10px 24px rgb(27 28 33 / 5%);
+  --shadow-hover: 0 18px 40px rgb(27 28 33 / 12%);
+  --poster-paper: #402fff;
+  --poster-ink: #ffffff;
+}
+
+/* ---------- токены: тёмная тема, атрибут data-theme="dark" на <html> ---------- */
+
+:root:not([data-brand="off"])[data-theme="dark"] {
   color-scheme: dark;
   --bg: #1b1c21;
   --surface: #222328;
@@ -15,11 +72,9 @@
   --text: #ededed;
   --text-2: #c8c9ca;
   --text-3: #9d9ea4;
-  --primary: #402fff;
   --primary-hover: #5445ff;
   --primary-text: #9088ff;
   --primary-soft: #26234a;
-  --accent: #ec1d35;
   --accent-soft: #3b1c23;
   --good: #5fd49a;
   --good-soft: #1b3128;
@@ -27,24 +82,13 @@
   --warn-soft: #362f19;
   --bad: #ff6b7a;
   --bad-soft: #3b1e25;
-  --live: #ec1d35;
-  --gold: #d8b554;
-  --gold-text: #2a1f00;
   --silver: #aab2bd;
-  --silver-text: #1d2127;
-  --bronze: #c9956a;
-  --bronze-text: #2b1707;
   --chip-bg: #d9d9d9;
   --panel-light: #ededed;
-  --panel-light-text: #1b1c21;
-  --trace: #c8c9ca;
-  --font: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-  --radius: 12px;
-  --radius-sm: 6px;
+  --link-hover: #b3adff;
+  --footer-bg: #17181c;
   --shadow: none;
   --shadow-hover: none;
-  --poster-paper: #402fff;
-  --poster-ink: #ffffff;
 }
 
 /* ---------- основа ---------- */
@@ -56,32 +100,30 @@ h1 { font-weight: 500; letter-spacing: -0.035em; }
 h2 { font-weight: 500; letter-spacing: -0.03em; }
 h3, .h3 { font-weight: 500; letter-spacing: -0.02em; }
 a { color: var(--primary-text); }
-a:hover { color: #b3adff; }
+a:hover { color: var(--link-hover); }
 ::selection { background: var(--primary); color: #fff; }
 :focus-visible { outline-color: var(--primary-text); }
 .eyebrow, .desk-label, .footer-head, .admin-label { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text-3); }
 
-/* ---------- шапка: светлая плашка, как на fsp-russia.ru ---------- */
+/* ---------- шапка: белая плашка в тонкой рамке, элементы тёмные в обеих темах ---------- */
 
-.site-header { background: transparent; border: 0; padding-top: 12px; }
+.site-header { background: var(--bg); border: 0; padding-top: 12px; }
 .site-header .header-row {
-  background: #ededed; /* запасной цвет для браузеров без color-mix, например Chrome на Windows 7 */
-  background: color-mix(in srgb, var(--panel-light) 96%, transparent);
-  color: var(--panel-light-text);
+  background: var(--bar-bg);
+  border: 2px solid var(--bar-fg);
+  color: var(--bar-fg);
   border-radius: var(--radius);
-  padding-inline: 22px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding-inline: 20px;
 }
-.site-header .fsp-logo { color: var(--panel-light-text); }
-.site-header .brand-region { color: #55565e; border-left-color: #b9bac0; }
-.main-nav a { color: var(--panel-light-text); font-size: 14px; white-space: nowrap; }
+.site-header .fsp-logo { color: var(--bar-fg); }
+.site-header .brand-region { color: var(--bar-muted); border-left-color: var(--bar-rule); }
+.main-nav a { color: var(--bar-fg); font-size: 14px; white-space: nowrap; }
 .main-nav a:hover { color: var(--primary); background: transparent; }
 .main-nav a.is-active { color: var(--primary); box-shadow: inset 0 -2px var(--primary); background: transparent; }
-.site-header .btn-ghost { color: var(--panel-light-text); border-color: #9d9ea4; background: transparent; }
-.site-header .btn-ghost:hover { border-color: var(--panel-light-text); background: rgb(27 28 33 / 6%); color: var(--panel-light-text); }
-.site-header .badge { background: #fff; color: var(--primary); }
-.mobile-menu summary span { background: var(--panel-light-text); }
+.site-header .btn-ghost { color: var(--bar-fg); border-color: var(--bar-line); background: transparent; }
+.site-header .btn-ghost:hover { border-color: var(--bar-fg); color: var(--bar-fg); background: color-mix(in srgb, var(--bar-fg) 8%, transparent); }
+.site-header .badge { background: var(--bar-fg); color: var(--bar-bg); }
+.mobile-menu summary span { background: var(--bar-fg); }
 .mobile-panel { background: var(--surface); border-color: var(--border); }
 .mobile-panel nav a { color: var(--text); }
 .mobile-panel nav a.is-active { background: var(--primary-soft); color: var(--text); }
@@ -114,7 +156,7 @@ a:hover { color: #b3adff; }
 
 .input { background-color: var(--surface); border-color: var(--border-strong); color: var(--text); }
 .input:hover { border-color: var(--text-3); }
-.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(64 47 255 / 35%); }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent); }
 .panel, .side-panel, .table-wrap, .facts, .auth-card, .task-card, .about-row, .card-list, .calendar-list, .news-list, .doc-list, .faq, .tile, .stat-tile, .todo {
   background: var(--surface); border-color: var(--border);
 }
@@ -124,7 +166,15 @@ table.data tbody tr:hover { background: var(--surface-2); }
 table.data tr.is-me { background: var(--primary-soft); }
 .tile-main { background: var(--primary); color: #fff; border-color: var(--primary); }
 .tile-main .tile-value, .tile-main .tile-label, .tile-main .tile-sub { color: #fff; }
-.site-footer { background: #17181c; border-top: 1px solid var(--border); }
+.site-footer { background: var(--footer-bg); border-top: 1px solid var(--border); }
+
+/* Переключатель темы: квадратная кнопка 32×32, как соседние .btn-sm (7px + 18px + 7px).
+   Иконка 20×20 из icons/ уменьшена до 18px и выставлена блоком, иначе строка подросла бы от базовой линии. */
+.theme-toggle { padding-inline: 7px; }
+.theme-icon { display: block; width: 18px; height: 18px; flex: 0 0 auto; color: inherit; }
+.theme-icon-dark { display: none; }
+:root[data-theme="dark"] .theme-icon-light { display: none; }
+:root[data-theme="dark"] .theme-icon-dark { display: block; }
 
 /* ---------- главная ---------- */
 

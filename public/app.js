@@ -1,3 +1,35 @@
+// Переключатель темы: меняет только цвета, выбор сохраняется в localStorage.
+// Тема по умолчанию светлая, её же ставит inline-скрипт в <head> до отрисовки.
+const THEME_KEY = 'fsp-theme';
+const THEME_COLOR = { light: '#ffffff', dark: '#1b1c21' };
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = THEME_COLOR[theme];
+  const label = theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему';
+  document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
+    button.setAttribute('aria-pressed', String(theme === 'dark'));
+  });
+}
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('[data-theme-toggle]')) return;
+  const theme = currentTheme() === 'dark' ? 'light' : 'dark';
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch (e) { /* без localStorage тема живёт только до перезагрузки */ }
+  applyTheme(theme);
+});
+
+applyTheme(currentTheme());
+
 // Небольшие улучшения поверх обычных форм: сайт работает и без JavaScript.
 document.addEventListener('submit', (event) => {
   const form = event.target;
