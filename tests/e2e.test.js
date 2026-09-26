@@ -28,7 +28,7 @@ function client() {
     async get(url) {
       const res = await fetch(base + url, { headers: { cookie: cookie() }, redirect: 'manual' });
       store(res);
-      return { status: res.status, location: res.headers.get('location'), text: await res.text() };
+      return { status: res.status, location: res.headers.get('location'), headers: res.headers, text: await res.text() };
     },
     async post(url, fields, { csrf = true } = {}) {
       if (!jar.has('fsp_csrf')) await this.get('/');
@@ -44,7 +44,7 @@ function client() {
         redirect: 'manual',
       });
       store(res);
-      return { status: res.status, location: res.headers.get('location'), text: await res.text() };
+      return { status: res.status, location: res.headers.get('location'), headers: res.headers, text: await res.text() };
     },
   };
 }
@@ -125,6 +125,18 @@ test('основной сценарий кейса от регистрации �
   assert.equal(r.location, '/admin');
   const participants = await org.get(`/admin/competitions/${cup.id}/participants`);
   assert.match(participants.text, /Тестов Тимур/);
+  const exportCsv = await org.get(`/admin/competitions/${cup.id}/participants.csv`);
+  assert.equal(exportCsv.status, 200);
+  assert.match(exportCsv.headers.get('content-type'), /text\/csv/);
+  const exportJson = await org.get(`/admin/competitions/${cup.id}/participants.json`);
+  assert.equal(exportJson.status, 200);
+  assert.ok(JSON.parse(exportJson.text).participants.some((row) => row.lastName === 'Тестов'));
+  const exportExcel = await org.get(`/admin/competitions/${cup.id}/participants.xlsx`);
+  assert.equal(exportExcel.status, 200);
+  assert.match(exportExcel.headers.get('content-type'), /ms-excel/);
+  assert.match(exportExcel.text, /Тестов/);
+  const guestExport = await client().get(`/admin/competitions/${cup.id}/participants.json`);
+  assert.equal(guestExport.status, 303);
 
   // До завершения результаты не вносятся
   r = await org.post(`/admin/events/${event.id}/results`, { action: 'save' });

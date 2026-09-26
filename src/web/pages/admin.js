@@ -357,7 +357,10 @@ export function participants(ctx) {
   const back = `/admin/competitions/${c.id}/participants`;
   const body = html`${ui.pageHead({ crumbs: [['/admin/competitions', 'Соревнования'], [`/admin/competitions/${c.id}`, c.title]], title: 'Участники',
       lede: html`${c.title}. ${registrationInfo(c).text}.`,
-      actions: html`<a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/participants.csv">Скачать CSV</a> <a class="btn btn-sm" href="/admin/competitions/${c.id}/results">К результатам</a>` })}
+      actions: html`<a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/participants.csv">CSV</a>
+        <a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/participants.json">JSON</a>
+        <a class="btn btn-ghost btn-sm" href="/admin/competitions/${c.id}/participants.xls">Excel</a>
+        <a class="btn btn-sm" href="/admin/competitions/${c.id}/results">К результатам</a>` })}
     ${competitionTabs(c, 'participants')}
     ${events.map((e) => {
       const rows = regs.filter((r) => r.event_id === e.id);
@@ -399,6 +402,44 @@ export function participantsCsv(ctx) {
   ]);
   ctx.file(csv([['Дисциплина', 'Фамилия', 'Имя', 'Отчество', 'Дата рождения', 'Населённый пункт', 'Организация', 'Статус заявки', 'Подана (UTC)'], ...rows]),
     `участники-${c.id}.csv`, 'text/csv; charset=utf-8');
+}
+
+const participantExportRows = (competitionId) => competitionRegistrations(competitionId).map((r) => ({
+  discipline: r.discipline_short,
+  lastName: r.last_name,
+  firstName: r.first_name,
+  middleName: r.middle_name || '',
+  birthDate: r.birth_date || '',
+  age: r.birth_date ? ageYears(r.birth_date) : null,
+  municipality: r.municipality || '',
+  organization: r.organization || '',
+  qualification: qualificationsMap().get(r.athlete_id)?.shortName || '',
+  status: r.status,
+  statusLabel: REG_STATUS_LABELS[r.status],
+  appliedAt: r.created_at,
+  hasAccount: Boolean(r.user_id),
+}));
+
+export function participantsJson(ctx) {
+  if (!requireOrganizer(ctx)) return;
+  const c = getCompetition(idParam(ctx));
+  if (!c) return notFound(ctx);
+  ctx.file(JSON.stringify({ competition: c.title, exportedAt: new Date().toISOString(), participants: participantExportRows(c.id) }, null, 2),
+    `participants-${c.id}.json`, 'application/json; charset=utf-8');
+}
+
+// Excel SpreadsheetML 2003 XML: opens in Excel without an XLSX library or dependency.
+const xmlEscape = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[ch]);
+
+export function participantsExcel(ctx) {
+  if (!requireOrganizer(ctx)) return;
+  const c = getCompetition(idParam(ctx));
+  if (!c) return notFound(ctx);
+  const headers = ['Дисциплина', 'Фамилия', 'Имя', 'Отчество', 'Дата рождения', 'Возраст', 'Населённый пункт', 'Организация', 'Квалификация', 'Статус', 'Статус заявки', 'Подана (UTC)', 'Есть аккаунт'];
+  const rows = participantExportRows(c.id).map((r) => [r.discipline, r.lastName, r.firstName, r.middleName, r.birthDate, r.age, r.municipality, r.organization, r.qualification, r.status, r.statusLabel, r.appliedAt, r.hasAccount ? 'Да' : 'Нет']);
+  const cell = (v) => `<Cell><Data ss:Type="${typeof v === 'number' ? 'Number' : 'String'}">${xmlEscape(v)}</Data></Cell>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Участники"><Table><Row>${headers.map(cell).join('')}</Row>${rows.map((r) => `<Row>${r.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;
+  ctx.file(xml, `participants-${c.id}.xls`, 'application/vnd.ms-excel; charset=utf-8');
 }
 
 // ---------- результаты ----------

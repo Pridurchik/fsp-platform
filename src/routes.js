@@ -73,6 +73,8 @@ route('POST', '/admin/competitions/:id', admin.updateCompetition);
 route('POST', '/admin/competitions/:id/transition', admin.transition);
 route('GET', '/admin/competitions/:id/participants', admin.participants);
 route('GET', '/admin/competitions/:id/participants.csv', admin.participantsCsv);
+route('GET', '/admin/competitions/:id/participants.json', admin.participantsJson);
+route('GET', '/admin/competitions/:id/participants.xlsx', admin.participantsExcel);
 route('POST', '/admin/registrations/:id/status', admin.registrationStatus);
 route('GET', '/admin/competitions/:id/results', admin.results);
 route('POST', '/admin/events/:id/results', admin.saveResults);
