@@ -104,6 +104,7 @@ test('команды: создание, вступление, лимиты, вы
   assert.ok(created.ok);
   assert.equal(created.inviteCode.length, 8);
   assert.ok(myTeamIn(comp, cap));
+  assert.equal(applyToEvent(athleteOf(cap), ev).code, 'team_size', 'неполная команда не может подать заявку');
   assert.match(createTeam(athleteOf(mkAthlete('Второй', yearsAgo(21))), comp, 'ракеты').error, /уже есть/);
   const other = mkAthlete('Другой', yearsAgo(22));
   const second = createTeam(athleteOf(other), comp, 'Кометы');
